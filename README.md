@@ -163,7 +163,23 @@ AIOS/
 sistema** e restano solo come riferimento storico. Le fonti di verità attuali sono
 `agents/*.md`, `mcp/servers.json`, `config/users.json` e `projects/<cliente>/`.
 
+## Deploy (GitHub + Vercel)
+
+La piattaforma è pronta per essere messa online: repository su GitHub per
+collaborare con il team + deploy automatico su Vercel per avere un dominio
+utilizzabile. L'autenticazione resta demo per ora; Clerk/altre soluzioni si
+aggiungono in una fase successiva.
+
+👉 **Guida passo-passo completa**: [docs/DEPLOY.md](docs/DEPLOY.md)
+
+> ⚠️ **Nota importante**: l'architettura attuale persiste su filesystem + stato
+> in-memory. Su Vercel serverless il FS è read-only e lo stato non persiste tra
+> le invocation, quindi le **scritture non sono persistenti** in produzione.
+> Va benissimo come demo; per uso reale serve migrare lo storage a un backend
+> esterno (DB/Blob/Redis) — vedi il caveat nel DEPLOY.md.
+
 ## Documentazione
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architettura e contratti (vincolante).
 - [docs/FASE2_PM.md](docs/FASE2_PM.md) — predisposizione del Project Manager AI (Fase 2).
+- [docs/DEPLOY.md](docs/DEPLOY.md) — guida deploy su GitHub + Vercel + caveat serverless.

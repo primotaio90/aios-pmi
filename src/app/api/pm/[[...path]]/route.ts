@@ -16,11 +16,12 @@ function bad(msg: string, status = 400) {
   return Response.json({ error: msg }, { status });
 }
 
-export async function GET(request: NextRequest, { params }: { params: { path?: string[] } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ path?: string[] }> }) {
   const { sys, user } = await requireUser(request);
   if (!user) return unauthorized();
   const url = new URL(request.url);
-  const segments = params.path || [];
+  const { path: rawPath = [] } = await params;
+  const segments = rawPath;
   const project = url.searchParams.get('project') || segments[0] || '';
   if (!project) return bad('Parametro "project" obbligatorio');
 
