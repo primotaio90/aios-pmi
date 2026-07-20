@@ -10,11 +10,9 @@ const SUGGESTIONS = [
 ];
 
 export function GoalComposer({
-    disabled,
     busy,
     onSubmit,
 }: {
-    disabled: boolean;
     busy: boolean;
     onSubmit: (text: string) => Promise<void>;
 }) {
@@ -53,7 +51,7 @@ export function GoalComposer({
                     value={text}
                     onChange={(e) => setText(e.target.value)}
                     rows={3}
-                    disabled={disabled || sending}
+                    disabled={sending}
                 />
                 <div className="goal-form-row">
                     <div className="goal-suggestions">
@@ -63,7 +61,7 @@ export function GoalComposer({
                                 type="button"
                                 className="goal-suggestion"
                                 onClick={() => setText(s)}
-                                disabled={disabled || sending}
+                                disabled={sending}
                                 title={s}
                             >
                                 {s}
@@ -73,14 +71,13 @@ export function GoalComposer({
                     <button
                         type="submit"
                         className="btn btn-primary goal-submit"
-                        disabled={disabled || sending || busy || text.trim().length < 5}
+                        disabled={sending || busy || text.trim().length < 5}
                     >
                         {sending ? 'Invio…' : 'Avvia orchestrazione'}
                     </button>
                 </div>
                 {error && <div className="login-error">{error}</div>}
             </form>
-            {disabled && <div className="goal-hint">Seleziona o crea un progetto cliente per inviare obiettivi.</div>}
         </div>
     );
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import type { AgentUsage, BusEvent, DirectorDrilldown, LogEntry, ModelInfo, Subagent } from '../lib/types';
 import { FileViewer } from './FileViewer';
+import { initials } from '../lib/text';
 
 /** Compact token string, e.g. "1M" / "200K" / "3.4K". */
 function fmtTokens(n: number | null | undefined): string {
@@ -141,7 +142,7 @@ export function DirectorPanel({
                         ← Home
                     </button>
                     <h1 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <span>{d.icon}</span>
+                        <span className="panel-icon">{initials(d.name)}</span>
                         {d.name}
                         <span className="badge">{d.department}</span>
                     </h1>
@@ -224,7 +225,7 @@ export function DirectorPanel({
                                     {data.subagents.map((s: Subagent) => (
                                         <div key={s.id} className={`subagent-card ${s.active ? 'active' : ''}`}>
                                             <div className="subagent-head">
-                                                <span className="subagent-icon">{s.icon}</span>
+                                                <span className="subagent-icon">{initials(s.name)}</span>
                                                 <div>
                                                     <div className="subagent-name">{s.name}</div>
                                                     <div className="subagent-model">{s.id}</div>

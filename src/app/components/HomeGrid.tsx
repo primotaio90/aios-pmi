@@ -1,6 +1,16 @@
 'use client';
 
 import type { DirectorOverview, OrchestratorOverview, ProjectMeta } from '../lib/types';
+import { initials } from '../lib/text';
+
+function openOnKey(onOpen: () => void) {
+    return (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onOpen();
+        }
+    };
+}
 
 const STATUS_LABEL: Record<string, string> = {
     idle: 'In attesa',
@@ -32,9 +42,15 @@ function OrchestratorCard({
 }) {
     const goal = orchestrator.active_goal;
     return (
-        <article className="glass home-card home-card-orchestrator" onClick={onOpen}>
+        <article
+            className="glass home-card home-card-orchestrator"
+            onClick={onOpen}
+            role="button"
+            tabIndex={0}
+            onKeyDown={openOnKey(onOpen)}
+        >
             <header className="home-card-header">
-                <div className="home-icon home-icon-core">{orchestrator.icon}</div>
+                <div className="home-icon home-icon-core">{initials(orchestrator.name)}</div>
                 <div className="home-card-title">
                     <h3>{orchestrator.name}</h3>
                     <span className="home-card-sub">Livello strategico · scomposizione e aggregazione</span>
@@ -82,9 +98,15 @@ function DirectorCard({
     onOpen: () => void;
 }) {
     return (
-        <article className="glass home-card" onClick={onOpen}>
+        <article
+            className="glass home-card"
+            onClick={onOpen}
+            role="button"
+            tabIndex={0}
+            onKeyDown={openOnKey(onOpen)}
+        >
             <header className="home-card-header">
-                <div className="home-icon">{director.icon}</div>
+                <div className="home-icon">{initials(director.name)}</div>
                 <div className="home-card-title">
                     <h3>{director.name}</h3>
                     <span className="home-card-sub">{director.department}</span>

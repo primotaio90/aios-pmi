@@ -10,6 +10,7 @@ import { DirectorPanel } from './components/DirectorPanel';
 import { GoalComposer } from './components/GoalComposer';
 import { PMConsole } from './components/PMConsole';
 import { ToastStack } from './components/Toast';
+import { initials } from './lib/text';
 
 export default function Dashboard() {
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined);
@@ -196,7 +197,6 @@ export default function Dashboard() {
         {projectId && overview && !openDirector && !openPM && (
           <div className="home-wrap">
             <GoalComposer
-              disabled={!projectId}
               busy={orchestrating}
               onSubmit={handleSubmitGoal}
             />
@@ -232,7 +232,7 @@ export default function Dashboard() {
         )}
 
         {projectId && openDirector && !isOrchestrator && !isDirector && (
-          <div className="glass panel-state login-error">⚠️ Agente non valido come drill-down.</div>
+          <div className="glass panel-state login-error">Agente non valido come drill-down.</div>
         )}
       </main>
 
@@ -263,7 +263,7 @@ function OrchestratorPanel({
             ← Home
           </button>
           <h1 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span>{o.icon}</span>
+            <span className="panel-icon">{initials(o.name)}</span>
             {o.name}
             <span className={`status-badge status-${o.status}`}>{o.status}</span>
           </h1>
@@ -289,6 +289,14 @@ function OrchestratorPanel({
                         key={m.department}
                         className={`macro-item macro-${m.status}`}
                         onClick={() => dir && onOpenDirector(dir.id)}
+                        role={dir ? 'button' : undefined}
+                        tabIndex={dir ? 0 : undefined}
+                        onKeyDown={(e) => {
+                          if (dir && (e.key === 'Enter' || e.key === ' ')) {
+                            e.preventDefault();
+                            onOpenDirector(dir.id);
+                          }
+                        }}
                       >
                         <span className="macro-dept">{m.department}</span>
                         <span className="macro-desc">{m.description}</span>
@@ -324,10 +332,10 @@ function EventTicker({ events }: { events: BusEvent[] }) {
         ) : (
           <ul className="log-list">
             {tail.map((e, i) => (
-              <li key={i} className="log-line">
+              <li key={i} className="ticker-line">
                 <span className="log-ts">{e.ts.slice(11, 19)}</span>
-                <span className="log-tool">{e.type}</span>
                 <span className="log-agent">{e.agent ?? '—'}</span>
+                <span className="log-tool">{e.type}</span>
                 <span className="log-preview">{summarize(e)}</span>
               </li>
             ))}

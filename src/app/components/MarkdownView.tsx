@@ -48,7 +48,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
 const HEADING_RE = /^(#{1,6})\s+(.*)$/;
 const HR_RE = /^\s*(-{3,}|\*{3,}|_{3,})\s*$/;
 const UL_RE = /^\s*[-*+]\s+(.*)$/;
-const OL_RE = /^\s*\d+[.)]\s+(.*)$/;
+const OL_RE = /^\s*(\d+)[.)]\s+(.*)$/;
 const TABLE_SEP_RE = /^\s*\|?\s*:?-{2,}[-\s:|]*$/;
 const CHECKBOX_RE = /^\[([ xX])\]\s+(.*)$/;
 
@@ -209,27 +209,47 @@ export function MarkdownView({ source }: { source: string }) {
             continue;
         }
 
+        // Righe di continuazione a rientro sospeso: appartengono all'item di lista
+        // precedente (i file di progetto scrivono spesso l'item su più righe).
+        const isContinuation = (l: string) =>
+            l.trim() !== '' && !UL_RE.test(l) && !OL_RE.test(l) && !isBlockStart(l) && !l.includes('|');
+
         // Lista puntata
         if (UL_RE.test(line)) {
             const items: string[] = [];
             while (i < lines.length && UL_RE.test(lines[i])) {
-                items.push(UL_RE.exec(lines[i])![1]);
+                let text = UL_RE.exec(lines[i])![1];
                 i++;
+                while (i < lines.length && isContinuation(lines[i])) {
+                    text += ' ' + lines[i].trim();
+                    i++;
+                }
+                items.push(text);
             }
             const key = `b${b++}`;
             blocks.push(<ul key={key}>{items.map((it, k) => listItem(it, `${key}-${k}`))}</ul>);
             continue;
         }
 
-        // Lista numerata
+        // Lista numerata (preserva il numero di partenza reale del sorgente)
         if (OL_RE.test(line)) {
             const items: string[] = [];
+            const start = Number(OL_RE.exec(line)![1]) || 1;
             while (i < lines.length && OL_RE.test(lines[i])) {
-                items.push(OL_RE.exec(lines[i])![1]);
+                let text = OL_RE.exec(lines[i])![2];
                 i++;
+                while (i < lines.length && isContinuation(lines[i])) {
+                    text += ' ' + lines[i].trim();
+                    i++;
+                }
+                items.push(text);
             }
             const key = `b${b++}`;
-            blocks.push(<ol key={key}>{items.map((it, k) => listItem(it, `${key}-${k}`))}</ol>);
+            blocks.push(
+                <ol key={key} start={start}>
+                    {items.map((it, k) => listItem(it, `${key}-${k}`))}
+                </ol>
+            );
             continue;
         }
 

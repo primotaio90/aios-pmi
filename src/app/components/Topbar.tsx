@@ -90,7 +90,7 @@ export function Topbar({
                     onClick={pmEnabled ? onOpenPM : undefined}
                     disabled={!pmEnabled}
                 >
-                    🧭 PM · Fase 2
+                    PM · Fase 2
                 </button>
 
                 <div className="user-chip">

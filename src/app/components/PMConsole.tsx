@@ -8,6 +8,7 @@ import type {
     PMOverview,
     PMSuggestion,
 } from '../lib/types';
+import { initials } from '../lib/text';
 
 /**
  * Project Manager console (Fase 2). The PM is a server-side agent above the
@@ -125,15 +126,15 @@ export function PMConsole({
                         ← Home
                     </button>
                     <h1 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <span style={{ color: pm?.color || '#22c55e' }}>{pm?.icon || '🧭'}</span>
+                        <span className="panel-icon">{initials(pm?.name || 'Project Manager')}</span>
                         {pm?.name || 'Project Manager'}
-                        <span className="badge" style={{ borderColor: '#22c55e55', color: '#22c55e' }}>Fase 2</span>
+                        <span className="badge">Fase 2</span>
                     </h1>
                     <div className="title-desc">Coordinamento consulenti · checklist · notifiche · dialogo</div>
                 </div>
             </div>
 
-            {error && <div className="glass panel-state login-error">⚠️ {error}</div>}
+            {error && <div className="glass panel-state login-error">{error}</div>}
 
             {!overview && !error && <div className="glass panel-state">Caricamento console PM…</div>}
 
@@ -152,14 +153,14 @@ export function PMConsole({
                     <div className="panel-grid panel-grid-2">
                         <div className="glass panel-block">
                             <div className="card-header">
-                                <h3 className="card-title"><span className="card-icon">🎯</span> Obiettivo attivo</h3>
+                                <h3 className="card-title">Obiettivo attivo</h3>
                             </div>
                             <div className="card-body">
                                 {overview.active_goal ? (
                                     <>
                                         <div className="home-goal-id">{overview.active_goal.id}</div>
                                         <div className="home-goal-text">{overview.active_goal.text}</div>
-                                        <div className="badge" style={{ borderColor: '#22c55e55', color: '#22c55e' }}>{overview.active_goal.status}</div>
+                                        <span className={`status-badge status-${overview.active_goal.status}`}>{overview.active_goal.status}</span>
                                     </>
                                 ) : (
                                     <div className="home-empty">Nessun obiettivo attivo.</div>
@@ -169,7 +170,7 @@ export function PMConsole({
 
                         <div className="glass panel-block">
                             <div className="card-header">
-                                <h3 className="card-title"><span className="card-icon">📌</span> Prossime azioni</h3>
+                                <h3 className="card-title">Prossime azioni</h3>
                             </div>
                             <div className="card-body">
                                 {suggestions.length === 0 ? (
@@ -178,7 +179,7 @@ export function PMConsole({
                                     <ul className="pm-suggestions">
                                         {suggestions.map((s, i) => (
                                             <li key={i} className={`pm-suggestion pm-sugg-${s.kind}`}>
-                                                {s.kind === 'blocked' ? '⛔' : s.kind === 'review' ? '🔍' : '✅'} {s.text}
+                                                {s.text}
                                             </li>
                                         ))}
                                     </ul>
@@ -188,22 +189,22 @@ export function PMConsole({
                     </div>
 
                     {/* Tabs */}
-                    <div className="pm-tabs">
+                    <nav className="pm-tabs">
                         <button className={`pm-tab ${tab === 'checklist' ? 'on' : ''}`} onClick={() => setTab('checklist')}>
-                            ✅ Checklist ({overview.checklist.length})
+                            Checklist ({overview.checklist.length})
                         </button>
                         <button className={`pm-tab ${tab === 'chat' ? 'on' : ''}`} onClick={() => setTab('chat')}>
-                            💬 Dialogo
+                            Dialogo
                         </button>
                         <button className={`pm-tab ${tab === 'notifications' ? 'on' : ''}`} onClick={() => setTab('notifications')}>
-                            📬 Notifiche ({overview.notifications.length})
+                            Notifiche ({overview.notifications.length})
                         </button>
-                    </div>
+                    </nav>
 
                     {tab === 'checklist' && (
                         <div className="glass panel-block">
                             <div className="card-header">
-                                <h3 className="card-title"><span className="card-icon">✅</span> Checklist interattiva</h3>
+                                <h3 className="card-title">Checklist interattiva</h3>
                             </div>
                             <div className="card-body">
                                 {overview.checklist.length === 0 ? (
@@ -233,7 +234,7 @@ export function PMConsole({
                     {tab === 'chat' && (
                         <div className="glass panel-block pm-chat-block">
                             <div className="card-header">
-                                <h3 className="card-title"><span className="card-icon">💬</span> Dialogo con il Project Manager</h3>
+                                <h3 className="card-title">Dialogo con il Project Manager</h3>
                             </div>
                             <div className="card-body pm-chat-body">
                                 <div className="pm-chat-history">
@@ -242,7 +243,7 @@ export function PMConsole({
                                     ) : (
                                         chat.map((m, i) => (
                                             <div key={i} className={`pm-chat-msg pm-chat-${m.role}`}>
-                                                <span className="pm-chat-author">{m.role === 'pm' ? '🧭 PM' : '🧑 Consulente'}</span>
+                                                <span className="pm-chat-author">{m.role === 'pm' ? 'PM' : 'Consulente'}</span>
                                                 <span className="pm-chat-text">{m.text}</span>
                                             </div>
                                         ))
@@ -268,7 +269,7 @@ export function PMConsole({
                         <div className="panel-grid panel-grid-2">
                             <div className="glass panel-block">
                                 <div className="card-header">
-                                    <h3 className="card-title"><span className="card-icon">📬</span> Notifiche email (audit)</h3>
+                                    <h3 className="card-title">Notifiche email (audit)</h3>
                                 </div>
                                 <div className="card-body">
                                     {overview.notifications.length === 0 ? (
@@ -292,7 +293,7 @@ export function PMConsole({
 
                             <div className="glass panel-block">
                                 <div className="card-header">
-                                    <h3 className="card-title"><span className="card-icon">✉️</span> Nuova notifica</h3>
+                                    <h3 className="card-title">Nuova notifica</h3>
                                 </div>
                                 <div className="card-body">
                                     <form className="pm-notif-form" onSubmit={sendNotif}>
