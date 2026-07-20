@@ -1,0 +1,81 @@
+{
+  "$comment": "Configurazione MCP dichiarativa. transport 'internal' = handler in-process deterministici (gateway.mjs). Un server 'stdio' con 'command' è il punto di estensione per MCP server reali. Le whitelist per-agente vivono nel frontmatter di agents/<id>.md (formato server.tool).",
+  "servers": {
+    "filesystem": {
+      "transport": "internal",
+      "description": "Accesso ai file del progetto, sandbox per-tenant (anti path-traversal nello Store).",
+      "tools": {
+        "fs_read": {
+          "description": "Legge un file di progetto (percorso relativo al tenant).",
+          "params": { "path": "string" }
+        },
+        "fs_write": {
+          "description": "Scrive o appende un file di progetto. mode: overwrite (default) | append.",
+          "params": { "path": "string", "content": "string", "mode": "string|optional" }
+        },
+        "fs_list": {
+          "description": "Elenca i file di una cartella del progetto.",
+          "params": { "dir": "string|optional" }
+        }
+      }
+    },
+    "research": {
+      "transport": "internal",
+      "description": "Ricerca di mercato. In modalità internal i risultati sono simulati e deterministici (marcati simulated: true).",
+      "tools": {
+        "web_search": {
+          "description": "Ricerca web su competitor, trend e fornitori.",
+          "params": { "query": "string" }
+        }
+      }
+    },
+    "data": {
+      "transport": "internal",
+      "description": "Analisi dati finanziari e di bilancio del cliente.",
+      "tools": {
+        "read_spreadsheet": {
+          "description": "Legge un foglio dati .csv del progetto e ne restituisce righe e colonne.",
+          "params": { "path": "string" }
+        },
+        "compute_roi": {
+          "description": "Calcola ROI percentuale e payback in mesi da investimento e risparmio annuo.",
+          "params": { "investment": "number", "annual_saving": "number" }
+        }
+      }
+    },
+    "diagram": {
+      "transport": "internal",
+      "description": "Generazione diagrammi Mermaid.js dei flussi aziendali.",
+      "tools": {
+        "mermaid_generate": {
+          "description": "Genera un flowchart Mermaid da una lista ordinata di passi.",
+          "params": { "title": "string|optional", "steps": "list" }
+        }
+      }
+    },
+    "api": {
+      "transport": "internal",
+      "description": "Analisi di documentazione API di gestionali legacy e CRM.",
+      "tools": {
+        "openapi_parse": {
+          "description": "Estrae la mappa endpoint da una spec API (JSON OpenAPI o testo) nel progetto.",
+          "params": { "path": "string" }
+        },
+        "http_probe": {
+          "description": "Verifica la raggiungibilità di un endpoint (simulato in transport internal).",
+          "params": { "url": "string" }
+        }
+      }
+    },
+    "tasks": {
+      "transport": "internal",
+      "description": "Aggiornamento dello stato dei task (macchina a stati validata).",
+      "tools": {
+        "task_update": {
+          "description": "Transiziona un task (pending/assigned/in_progress/blocked/review/done).",
+          "params": { "task_id": "string", "status": "string" }
+        }
+      }
+    }
+  }
+}

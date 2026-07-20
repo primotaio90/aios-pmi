@@ -1,0 +1,30 @@
+{
+  "$comment": "Consulenti dello studio. Password demo per tutti: aios2026 (sha256). Il ruolo project_manager è riservato alla Fase 2 e l'account è disabilitato.",
+  "users": [
+    {
+      "username": "mrossi",
+      "name": "Marta Rossi",
+      "role": "consultant",
+      "password_sha256": "d2dd814ffb9031abc41e2364c6e967f3b25eb4a59a11c531abbedd3fda1d6309"
+    },
+    {
+      "username": "lbianchi",
+      "name": "Luca Bianchi",
+      "role": "consultant",
+      "password_sha256": "d2dd814ffb9031abc41e2364c6e967f3b25eb4a59a11c531abbedd3fda1d6309"
+    },
+    {
+      "username": "gverdi",
+      "name": "Giulia Verdi",
+      "role": "consultant",
+      "password_sha256": "d2dd814ffb9031abc41e2364c6e967f3b25eb4a59a11c531abbedd3fda1d6309"
+    },
+    {
+      "username": "pm_agent",
+      "name": "Project Manager AI (Fase 2)",
+      "role": "project_manager",
+      "disabled": true,
+      "password_sha256": ""
+    }
+  ]
+}

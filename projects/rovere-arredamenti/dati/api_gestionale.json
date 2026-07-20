@@ -1,0 +1,26 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "GestArredo 9 — API gestionale",
+    "version": "9.4.2",
+    "description": "API parziali del gestionale legacy di Rovere & Figli. Autenticazione basic, risposte XML/JSON miste."
+  },
+  "servers": [{ "url": "https://gestionale.cliente.local/api" }],
+  "paths": {
+    "/articoli": {
+      "get": { "summary": "Elenco articoli a catalogo con codice, descrizione e famiglia" }
+    },
+    "/articoli/{codice}": {
+      "get": { "summary": "Dettaglio articolo per codice interno" }
+    },
+    "/giacenze": {
+      "get": { "summary": "Giacenze di magazzino per articolo e ubicazione (aggiornate a fine giornata)" }
+    },
+    "/movimenti": {
+      "post": { "summary": "Registra un movimento di carico/scarico magazzino" }
+    },
+    "/ordini": {
+      "get": { "summary": "Ordini clienti aperti con righe e stato evasione" }
+    }
+  }
+}
