@@ -41,10 +41,12 @@ export type AgentMeta = {
     system_prompt_chars?: number;
 };
 
+export type ProviderId = 'mock' | 'anthropic' | 'openai';
+
 export type RegistryResponse = {
     agents: AgentMeta[];
     errors: { agent?: string; error: string }[];
-    runner: 'mock' | 'claude';
+    runner: ProviderId;
 };
 
 export type ProjectMeta = {
@@ -189,6 +191,62 @@ export type Toast = {
     level: 'info' | 'warn' | 'error' | 'success';
     message: string;
 };
+
+// --- LLM settings types -------------------------------------------------------
+
+export type MaskedKey = { set: boolean; hint: string; env: boolean };
+
+export type LlmSettings = {
+    provider: ProviderId;
+    anthropic: { baseURL: string; model: string; apiKey: MaskedKey };
+    openai: { baseURL: string; model: string; apiKey: MaskedKey };
+    params: { temperature: number | null; maxTokens: number; thinking: boolean };
+    agentModelOverrides: Record<string, string>;
+};
+
+export type ModelCatalogEntry = { label: string; context_window: number; max_output: number; tier: string };
+export type ModelCatalog = Record<string, ModelCatalogEntry>;
+
+export type McpToolSpec = { description?: string; params?: Record<string, string> };
+export type McpServerCatalog = Record<
+    string,
+    { transport?: string; description?: string; tools: Record<string, McpToolSpec> }
+>;
+
+export type SettingsResponse = {
+    settings: LlmSettings;
+    catalog: ModelCatalog;
+    providers: ProviderId[];
+    servers: McpServerCatalog;
+};
+
+export type SettingsPatch = {
+    provider?: ProviderId;
+    anthropic?: { baseURL?: string; model?: string; apiKey?: string };
+    openai?: { baseURL?: string; model?: string; apiKey?: string };
+    params?: { temperature?: number | null; maxTokens?: number; thinking?: boolean };
+    agentModelOverrides?: Record<string, string>;
+};
+
+// --- Per-agent chat / instructions / capabilities -----------------------------
+
+export type AgentChatMessage = {
+    ts: string;
+    by: string;
+    role: 'user' | 'agent';
+    text: string;
+};
+
+export type AgentChatResponse = {
+    reply: string;
+    history: AgentChatMessage[];
+};
+
+export type AgentNote = { ts: string; text: string };
+
+export type Capability = { qualified: string; server: string; tool: string; description: string };
+
+export type CapabilitiesResponse = { available: Capability[]; current: string[] };
 
 // --- Project Manager (Fase 2) types -------------------------------------------
 

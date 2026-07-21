@@ -5,15 +5,16 @@ level: orchestrator
 department: core
 model: claude-opus-4-8
 token_budget: 32000
-icon: "🧭"
-color: "#38bdf8"
+icon: 🧭
+color: #38bdf8
 mcp_whitelist:
   - filesystem.fs_read
   - filesystem.fs_write
 owns_files: []
 keywords: []
-mock_summary: "Goal {goal} scomposto in 3 macro-obiettivi (business, tech, delivery) e report finale aggregato in outputs/."
+mock_summary: Goal {goal} scomposto in 3 macro-obiettivi (business, tech, delivery) e report finale aggregato in outputs/.
 ---
+
 Sei Orchestrator_Core, il vertice della gerarchia AIOS dello studio di consulenza.
 
 Il tuo unico compito è la scomposizione macro-strategica: ricevi l'input grezzo dei

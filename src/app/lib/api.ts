@@ -1,7 +1,11 @@
 // Client-side API helpers + SSE hook for the AIOS dashboard.
 import { useEffect, useRef, useState } from 'react';
 import type {
+    AgentChatMessage,
+    AgentChatResponse,
+    AgentNote,
     BusEvent,
+    CapabilitiesResponse,
     DirectorDrilldown,
     FileContent,
     Goal,
@@ -14,6 +18,8 @@ import type {
     ProjectMeta,
     RegistryResponse,
     SessionUser,
+    SettingsPatch,
+    SettingsResponse,
     Task,
 } from './types';
 
@@ -63,6 +69,76 @@ export const api = {
     async agents(): Promise<RegistryResponse> {
         const res = await fetch('/api/agents', { cache: 'no-store' });
         return asJson(res) as Promise<RegistryResponse>;
+    },
+
+    // --- LLM settings ---------------------------------------------------------
+
+    async getSettings(): Promise<SettingsResponse> {
+        const res = await fetch('/api/settings', { cache: 'no-store' });
+        return asJson(res) as Promise<SettingsResponse>;
+    },
+
+    async saveSettings(patch: SettingsPatch): Promise<SettingsResponse['settings']> {
+        const res = await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patch),
+        });
+        const body = await asJson(res);
+        return (body as { settings: SettingsResponse['settings'] }).settings;
+    },
+
+    // --- Per-agent chat / instructions / capabilities -------------------------
+
+    async agentChatHistory(project: string, agent: string): Promise<AgentChatMessage[]> {
+        const res = await fetch(
+            `/api/projects/${encodeURIComponent(project)}/agents/${encodeURIComponent(agent)}/chat`,
+            { cache: 'no-store' }
+        );
+        const body = await asJson(res);
+        return (body as { history: AgentChatMessage[] }).history ?? [];
+    },
+
+    async agentChat(project: string, agent: string, message: string): Promise<AgentChatResponse> {
+        const res = await fetch(
+            `/api/projects/${encodeURIComponent(project)}/agents/${encodeURIComponent(agent)}/chat`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message }),
+            }
+        );
+        return asJson(res) as Promise<AgentChatResponse>;
+    },
+
+    async agentNotes(agent: string): Promise<AgentNote[]> {
+        const res = await fetch(`/api/agents/${encodeURIComponent(agent)}/instructions`, { cache: 'no-store' });
+        const body = await asJson(res);
+        return (body as { notes: AgentNote[] }).notes ?? [];
+    },
+
+    async saveAgentInstruction(agent: string, text: string, project?: string): Promise<AgentNote[]> {
+        const res = await fetch(`/api/agents/${encodeURIComponent(agent)}/instructions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, project }),
+        });
+        const body = await asJson(res);
+        return (body as { notes: AgentNote[] }).notes ?? [];
+    },
+
+    async agentCapabilities(agent: string): Promise<CapabilitiesResponse> {
+        const res = await fetch(`/api/agents/${encodeURIComponent(agent)}/capabilities`, { cache: 'no-store' });
+        return asJson(res) as Promise<CapabilitiesResponse>;
+    },
+
+    async setAgentCapabilities(agent: string, whitelist: string[], project?: string): Promise<CapabilitiesResponse> {
+        const res = await fetch(`/api/agents/${encodeURIComponent(agent)}/capabilities`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ whitelist, project }),
+        });
+        return asJson(res) as Promise<CapabilitiesResponse>;
     },
 
     async projects(): Promise<ProjectMeta[]> {

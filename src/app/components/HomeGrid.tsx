@@ -33,12 +33,30 @@ function ProgressBar({ value }: { value: number | null }) {
     );
 }
 
+function ChatButton({ onChat }: { onChat: () => void }) {
+    return (
+        <button
+            type="button"
+            className="home-chat-btn"
+            title="Chat diretta con questo agente"
+            onClick={(e) => {
+                e.stopPropagation();
+                onChat();
+            }}
+        >
+            💬
+        </button>
+    );
+}
+
 function OrchestratorCard({
     orchestrator,
     onOpen,
+    onChat,
 }: {
     orchestrator: OrchestratorOverview;
     onOpen: () => void;
+    onChat: () => void;
 }) {
     const goal = orchestrator.active_goal;
     return (
@@ -56,6 +74,7 @@ function OrchestratorCard({
                     <span className="home-card-sub">Livello strategico · scomposizione e aggregazione</span>
                 </div>
                 <StatusBadge status={orchestrator.status} />
+                <ChatButton onChat={onChat} />
             </header>
 
             <div className="home-progress">
@@ -93,9 +112,11 @@ function OrchestratorCard({
 function DirectorCard({
     director,
     onOpen,
+    onChat,
 }: {
     director: DirectorOverview;
     onOpen: () => void;
+    onChat: () => void;
 }) {
     return (
         <article
@@ -131,7 +152,10 @@ function DirectorCard({
 
             <footer className="home-card-foot">
                 <span className="badge">{director.active_subagents} sub-agenti attivi</span>
-                <span className="home-enter">Apri dettaglio →</span>
+                <span className="home-foot-actions">
+                    <ChatButton onChat={onChat} />
+                    <span className="home-enter">Apri dettaglio →</span>
+                </span>
             </footer>
         </article>
     );
@@ -142,11 +166,13 @@ export function HomeGrid({
     orchestrator,
     directors,
     onOpenDirector,
+    onChatAgent,
 }: {
     project: ProjectMeta;
     orchestrator: OrchestratorOverview | null;
     directors: DirectorOverview[];
     onOpenDirector: (id: string) => void;
+    onChatAgent: (id: string) => void;
 }) {
     return (
         <section className="home-section">
@@ -161,12 +187,21 @@ export function HomeGrid({
 
             <div className="home-grid">
                 {orchestrator ? (
-                    <OrchestratorCard orchestrator={orchestrator} onOpen={() => onOpenDirector(orchestrator.id)} />
+                    <OrchestratorCard
+                        orchestrator={orchestrator}
+                        onOpen={() => onOpenDirector(orchestrator.id)}
+                        onChat={() => onChatAgent(orchestrator.id)}
+                    />
                 ) : (
                     <div className="glass home-card home-empty">Orchestratore non disponibile.</div>
                 )}
                 {directors.map((d) => (
-                    <DirectorCard key={d.id} director={d} onOpen={() => onOpenDirector(d.id)} />
+                    <DirectorCard
+                        key={d.id}
+                        director={d}
+                        onOpen={() => onOpenDirector(d.id)}
+                        onChat={() => onChatAgent(d.id)}
+                    />
                 ))}
             </div>
         </section>

@@ -12,6 +12,7 @@ export function Topbar({
     connected,
     pmEnabled,
     onOpenPM,
+    onOpenSettings,
     onLogout,
 }: {
     user: SessionUser;
@@ -22,6 +23,7 @@ export function Topbar({
     connected: boolean;
     pmEnabled: boolean;
     onOpenPM: () => void;
+    onOpenSettings: () => void;
     onLogout: () => void;
 }) {
     const [creating, setCreating] = useState(false);
@@ -91,6 +93,16 @@ export function Topbar({
                     disabled={!pmEnabled}
                 >
                     PM · Fase 2
+                </button>
+
+                <button
+                    type="button"
+                    className="btn btn-secondary topbar-gear"
+                    title="Impostazioni modello e provider"
+                    aria-label="Impostazioni"
+                    onClick={onOpenSettings}
+                >
+                    ⚙️
                 </button>
 
                 <div className="user-chip">

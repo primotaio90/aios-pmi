@@ -2039,3 +2039,189 @@ textarea {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--focus-ring);
 }
+/* --- Settings panel (LLM provider / params / per-agent model) --------------- */
+.topbar-gear {
+  padding: 8px 12px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.settings-help {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.settings-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-check input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.settings-dim {
+  opacity: 0.55;
+}
+
+.settings-agent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-agent-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 320px);
+  align-items: center;
+  gap: 16px;
+}
+
+.settings-agent-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 0;
+}
+
+.settings-agent-mono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.settings-agent-level {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+@media (max-width: 640px) {
+  .settings-agent-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}
+
+/* --- Per-agent chat / instructions / capabilities -------------------------- */
+.home-chat-btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  width: 34px;
+  height: 34px;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+.home-chat-btn:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.home-foot-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.subagent-chat-btn {
+  margin-top: 12px;
+  width: 100%;
+  justify-content: center;
+}
+
+.agent-chat-pin {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  opacity: 0.5;
+  padding: 0 2px;
+  align-self: flex-start;
+  transition: opacity 0.15s;
+}
+.agent-chat-pin:hover {
+  opacity: 1;
+}
+
+.agent-note-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.agent-note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+}
+.agent-note-ts {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+.agent-note-text {
+  font-size: 14px;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.agent-tool-group {
+  margin-top: 16px;
+}
+.agent-tool-server {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  margin-bottom: 6px;
+}

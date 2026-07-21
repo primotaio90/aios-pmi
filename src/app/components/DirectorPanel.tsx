@@ -79,11 +79,13 @@ export function DirectorPanel({
     directorId,
     events,
     onBack,
+    onChatAgent,
 }: {
     project: string;
     directorId: string;
     events: BusEvent[];
     onBack: () => void;
+    onChatAgent: (id: string) => void;
 }) {
     const [data, setData] = useState<DirectorDrilldown | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -151,6 +153,9 @@ export function DirectorPanel({
                         <span>budget {d.token_budget.toLocaleString()} token · file di competenza: {d.owns_files.length}</span>
                     </div>
                 </div>
+                <button className="btn btn-secondary" onClick={() => onChatAgent(d.id)}>
+                    💬 Chat
+                </button>
             </div>
 
             <nav className="panel-tabs">
@@ -243,6 +248,12 @@ export function DirectorPanel({
                                                     <span key={w} className="wl-tool">{w}</span>
                                                 ))}
                                             </div>
+                                            <button
+                                                className="btn btn-secondary subagent-chat-btn"
+                                                onClick={() => onChatAgent(s.id)}
+                                            >
+                                                💬 Chat con {s.name}
+                                            </button>
                                         </div>
                                     ))}
                                 </div>

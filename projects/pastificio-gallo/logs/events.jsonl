@@ -165,3 +165,4 @@
 {"ts":"2026-07-20T18:49:03.477Z","project":"pastificio-gallo","type":"pm.suggestion","agent":"project_manager","data":{"suggestions":[{"kind":"ok","text":"Nessuna azione bloccante. Il progetto procede regolarmente."}]}}
 {"ts":"2026-07-20T18:49:03.692Z","project":"pastificio-gallo","type":"pm.suggestion","agent":"project_manager","data":{"suggestions":[{"kind":"ok","text":"Nessuna azione bloccante. Il progetto procede regolarmente."}]}}
 {"ts":"2026-07-20T18:49:03.906Z","project":"pastificio-gallo","type":"pm.suggestion","agent":"project_manager","data":{"suggestions":[{"kind":"ok","text":"Nessuna azione bloccante. Il progetto procede regolarmente."}]}}
+{"ts":"2026-07-21T20:58:40.629Z","project":"pastificio-gallo","type":"agent.capabilities","agent":null,"data":{"agent":"orchestrator_core","by":"mrossi","count":2}}

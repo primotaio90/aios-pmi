@@ -311,3 +311,37 @@ Flusso `submitGoal`:
 | Drill-down con file e log | `/api/projects/:p/directors/:d` + pannello UI |
 | Spawn/teardown tracciati | `logs/lifecycle.jsonl` + eventi `agent.spawned/teardown` |
 | Nuovo sub-agente = solo un file .md | Registry + watch + playbook mock generico |
+
+## 11. Configurazione LLM da UI + interazione diretta con gli agenti
+
+Estensione della dashboard (non altera i contratti §1-§10):
+
+- **Impostazioni LLM a runtime** (`src/lib/aios/settings.mjs`): provider
+  (`mock | anthropic | openai`), base URL, chiavi API, modello e parametri di
+  generazione (temperature, max_tokens, thinking) + override del modello per
+  agente. Persistite in `config/llm_settings.local.json` (gitignored), lette
+  **per chiamata** — il cambio ha effetto senza riavvio. Env
+  (`ANTHROPIC_API_KEY`/`OPENAI_API_KEY`) resta il fallback. API: `GET/POST /api/settings`
+  (chiavi mai restituite in chiaro). UI: pannello ⚙️ in topbar.
+- **Astrazione provider** (`src/lib/aios/llm/{index,anthropic,openai}.mjs`): stessa
+  interfaccia (`completeJSON`/`completeText`/`runToolLoop`) per Anthropic-protocol
+  e OpenAI-compatibile. Il runner `runners/claude.mjs` la consuma; `system.mjs`
+  costruisce un **dispatcher** che sceglie mock ↔ reale per chiamata secondo
+  `settings.provider`.
+- **Chat umano→agente** (`src/lib/aios/chat.mjs`): canale laterale che consente a
+  un consulente di conversare con QUALSIASI singolo agente. NON viola la regola
+  §4 (gli agenti fra loro restano solo-verticali): qui è l'umano a parlare con un
+  agente. In modalità reale la chat usa un tool-loop limitato alla `mcp_whitelist`
+  dell'agente (gateway + audit identici alle run). Storico in
+  `state/agent_chat_<agentId>.json`. API: `GET/POST /api/projects/:p/agents/:a/chat`.
+  Evento bus `agent.chat`.
+- **Correzioni durevoli** (`src/lib/aios/agentEdit.mjs` → `appendInstruction`):
+  una correzione diventa una "nota operativa" permanente in un blocco gestito del
+  corpo di `agents/<id>.md`, quindi entra nel system prompt e vale anche nelle run
+  future (hot-reload). API: `GET/POST /api/agents/:a/instructions`.
+- **Editor capacità** (`agentEdit.mjs` → `setWhitelist`): concede/revoca i tool MCP
+  dell'agente scrivendo `mcp_whitelist` nel frontmatter (validato contro
+  `mcp/servers.json`, hot-reload). API: `GET/POST /api/agents/:a/capabilities`.
+
+Caveat serverless (Vercel, FS read-only): settings/chat/note/whitelist non
+persistono in produzione — usare env per le chiavi (vedi `docs/DEPLOY.md`).

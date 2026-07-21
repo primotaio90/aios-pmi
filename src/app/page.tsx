@@ -9,6 +9,8 @@ import { HomeGrid } from './components/HomeGrid';
 import { DirectorPanel } from './components/DirectorPanel';
 import { GoalComposer } from './components/GoalComposer';
 import { PMConsole } from './components/PMConsole';
+import { SettingsPanel } from './components/SettingsPanel';
+import { AgentChat } from './components/AgentChat';
 import { ToastStack } from './components/Toast';
 import { initials } from './lib/text';
 
@@ -20,6 +22,8 @@ export default function Dashboard() {
   const [overviewError, setOverviewError] = useState<string | null>(null);
   const [openDirector, setOpenDirector] = useState<string | null>(null);
   const [openPM, setOpenPM] = useState(false);
+  const [openSettings, setOpenSettings] = useState(false);
+  const [chatAgent, setChatAgent] = useState<string | null>(null);
   const [orchestrating, setOrchestrating] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -124,7 +128,17 @@ export default function Dashboard() {
     setProjectId(null);
     setOverview(null);
     setOpenDirector(null);
+    setOpenPM(false);
+    setOpenSettings(false);
+    setChatAgent(null);
   };
+
+  const openChat = useCallback((id: string) => {
+    setOpenDirector(null);
+    setOpenPM(false);
+    setOpenSettings(false);
+    setChatAgent(id);
+  }, []);
 
   const handleCreateProject = async (input: { name: string; client?: string; description?: string }) => {
     const p = await api.createProject(input);
@@ -167,18 +181,39 @@ export default function Dashboard() {
           setProjectId(id);
           setOpenDirector(null);
           setOpenPM(false);
+          setOpenSettings(false);
+          setChatAgent(null);
         }}
         onCreate={handleCreateProject}
         connected={connected}
         pmEnabled={Boolean(current?.pm_enabled)}
         onOpenPM={() => {
           setOpenDirector(null);
+          setOpenSettings(false);
+          setChatAgent(null);
           setOpenPM(true);
+        }}
+        onOpenSettings={() => {
+          setOpenDirector(null);
+          setOpenPM(false);
+          setChatAgent(null);
+          setOpenSettings(true);
         }}
         onLogout={handleLogout}
       />
 
       <main className="dashboard-main">
+        {openSettings ? (
+          <SettingsPanel onBack={() => setOpenSettings(false)} pushToast={pushToast} />
+        ) : chatAgent && projectId ? (
+          <AgentChat
+            project={projectId}
+            agentId={chatAgent}
+            onBack={() => setChatAgent(null)}
+            pushToast={pushToast}
+          />
+        ) : (
+          <>
         {!projectId && (
           <div className="glass empty-state">
             <h2>Benvenuto, {user.name.split(' ')[0]}</h2>
@@ -205,6 +240,7 @@ export default function Dashboard() {
               orchestrator={overview.orchestrator}
               directors={overview.directors}
               onOpenDirector={(id) => setOpenDirector(id)}
+              onChatAgent={openChat}
             />
           </div>
         )}
@@ -215,6 +251,7 @@ export default function Dashboard() {
             events={events}
             onBack={() => setOpenDirector(null)}
             onOpenDirector={(id) => setOpenDirector(id)}
+            onChatAgent={openChat}
           />
         )}
 
@@ -224,6 +261,7 @@ export default function Dashboard() {
             directorId={openDirector}
             events={events}
             onBack={() => setOpenDirector(null)}
+            onChatAgent={openChat}
           />
         )}
 
@@ -233,6 +271,8 @@ export default function Dashboard() {
 
         {projectId && openDirector && !isOrchestrator && !isDirector && (
           <div className="glass panel-state login-error">Agente non valido come drill-down.</div>
+        )}
+          </>
         )}
       </main>
 
@@ -247,11 +287,13 @@ function OrchestratorPanel({
   events,
   onBack,
   onOpenDirector,
+  onChatAgent,
 }: {
   overview: OverviewResponse;
   events: BusEvent[];
   onBack: () => void;
   onOpenDirector: (id: string) => void;
+  onChatAgent: (id: string) => void;
 }) {
   const o = overview.orchestrator!;
   const goal = o.active_goal;
@@ -269,6 +311,9 @@ function OrchestratorPanel({
           </h1>
           <div className="title-desc">Livello strategico · scomposizione e aggregazione report</div>
         </div>
+        <button className="btn btn-secondary" onClick={() => onChatAgent(o.id)}>
+          💬 Chat
+        </button>
       </div>
 
       <div className="panel-grid panel-grid-1">

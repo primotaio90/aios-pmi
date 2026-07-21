@@ -8,9 +8,12 @@ import { McpGateway } from './gateway.mjs';
 import { Lifecycle } from './lifecycle.mjs';
 import { Engine } from './engine.mjs';
 import { ProjectManager } from './pm.mjs';
+import { AgentChat } from './chat.mjs';
+import { AgentEditor } from './agentEdit.mjs';
 import { Auth } from './auth.mjs';
 import { createRunner as createMockRunner } from './runners/mock.mjs';
-import { createRunner as createClaudeRunner } from './runners/claude.mjs';
+import { createRunner as createLlmRunner } from './runners/claude.mjs';
+import { getSettings } from './settings.mjs';
 
 // Repo root, independent of process.cwd(): src/lib/aios/ -> ../../..
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -33,7 +36,8 @@ async function build() {
   registry.watch();
 
   const lifecycle = new Lifecycle(registry, bus);
-  const runnerMode = process.env.AIOS_RUNNER === 'claude' ? 'claude' : 'mock';
+  // Boot default only; the live provider is read per call from settings below.
+  const bootRunnerMode = process.env.AIOS_RUNNER === 'claude' ? 'claude' : 'mock';
 
   // Fraction of an agent's token_budget (output) or model context window (input)
   // beyond which a warning notification is raised.
@@ -92,10 +96,25 @@ async function build() {
   };
 
   const deps = { registry, store, gateway, tasks, reportUsage };
-  const runner = runnerMode === 'claude' ? createClaudeRunner(deps) : createMockRunner(deps);
+  // Both runners are always built; a dispatcher picks per call based on the live
+  // settings.provider, so the UI can flip mock ↔ real (anthropic/openai) without
+  // rebuilding this singleton.
+  const mockRunner = createMockRunner(deps);
+  const llmRunner = createLlmRunner(deps);
+  const RUNNER_METHODS = ['decompose', 'plan', 'runExpert', 'synthesize', 'aggregate'];
+  const runner = {};
+  for (const method of RUNNER_METHODS) {
+    runner[method] = async (...args) => {
+      const settings = await getSettings();
+      const active = settings.provider === 'mock' ? mockRunner : llmRunner;
+      return active[method](...args);
+    };
+  }
   const engine = new Engine({ registry, store, bus, tasks, gateway, lifecycle, runner });
   const pm = new ProjectManager({ registry, store, bus, tasks, engine });
   pm.start(); // subscribe to goal.*/task.* and emit pm.* notifications
+  const chat = new AgentChat({ registry, store, gateway, bus });
+  const agentEditor = new AgentEditor({ registry, gateway, bus });
   const auth = new Auth(path.join(ROOT, 'config', 'users.json'));
 
   // Persistence wiring: single writer for every audit log (no double logging).
@@ -114,7 +133,23 @@ async function build() {
     persist().catch((err) => console.error('[aios] persistenza log fallita:', err.message));
   });
 
-  return { root: ROOT, runnerMode, bus, store, registry, tasks, gateway, lifecycle, engine, pm, auth };
+  return {
+    root: ROOT,
+    runnerMode: bootRunnerMode,
+    // Live provider from the editable settings (mock | anthropic | openai).
+    getProvider: async () => (await getSettings()).provider,
+    bus,
+    store,
+    registry,
+    tasks,
+    gateway,
+    lifecycle,
+    engine,
+    pm,
+    chat,
+    agentEditor,
+    auth,
+  };
 }
 
 export function getSystem() {

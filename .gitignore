@@ -33,6 +33,9 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# LLM settings edited from the dashboard (may contain API keys)
+/config/llm_settings.local.json
+
 # vercel
 .vercel
 

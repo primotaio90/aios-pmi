@@ -14,5 +14,5 @@ export async function GET(request: Request) {
     const { system_prompt, ...meta } = a;
     return { ...meta, system_prompt_chars: String(system_prompt || '').length };
   });
-  return Response.json({ agents, errors: sys.registry.errors, runner: sys.runnerMode });
+  return Response.json({ agents, errors: sys.registry.errors, runner: await sys.getProvider() });
 }
