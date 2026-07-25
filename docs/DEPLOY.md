@@ -20,7 +20,7 @@ soluzioni si aggiungono in una fase successiva.
 
 ### 2a. Creare la repository su GitHub
 1. Vai su https://github.com/new.
-2. **Repository name**: `aios` (o un nome a scelta).
+2. **Repository name**: `aios-pmi` (o un nome a scelta).
 3. **Visibility**: `Private` (consigliato — contiene log e dati di progetto).
 4. **NON** inizializzare con README/.gitignore/license (li abbiamo già in locale).
 5. Clicca **Create repository**.
@@ -29,15 +29,14 @@ soluzioni si aggiungono in una fase successiva.
 Dalla cartella del progetto (`/Users/lina/Desktop/AIOS`):
 
 ```bash
-# (sostituisci <TWO_USERNAME> con il tuo username GitHub)
-git remote add origin https://github.com/<TWO_USERNAME>/aios.git
+git remote add origin https://github.com/primotaio90/aios-pmi.git
 git branch -M main
 git push -u origin main
 ```
 
 Se preferisci SSH:
 ```bash
-git remote add origin git@github.com:<TWO_USERNAME>/aios.git
+git remote add origin git@github.com:primotaio90/aios-pmi.git
 git push -u origin main
 ```
 
@@ -45,7 +44,7 @@ git push -u origin main
 I collaboratori vanno aggiunti su GitHub: **Settings → Collaborators → Add people**.
 Ognuno clona con:
 ```bash
-git clone https://github.com/<TWO_USERNAME>/aios.git
+git clone https://github.com/primotaio90/aios-pmi.git
 cd aios
 npm install
 npm run dev
@@ -61,7 +60,7 @@ npm run dev
 
 ### 3a. Importare il progetto
 1. Vai su https://vercel.com/new.
-2. Seleziona la repository `aios` appena creata (se non la vedi, clicca
+2. Seleziona la repository `aios-pmi` appena creata (se non la vedi, clicca
    "Adjust GitHub App Permissions" e autorizza Vercel).
 3. **Framework Preset**: viene rilevato automaticamente come **Next.js**.
 4. **Root Directory**: lascia `./` (il default).
