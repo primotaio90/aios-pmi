@@ -12,14 +12,14 @@
  *
  * NOTE: on serverless (Vercel) the FS is read-only, so writes won't persist in
  * production — same caveat as the rest of the AIOS state (see docs/DEPLOY.md).
- * There, set credentials via env (ANTHROPIC_API_KEY / OPENAI_API_KEY).
+ * On a persistent host (Fly.io) the file lives on the mounted volume via
+ * AIOS_ROOT (see docs/DEPLOY.md).
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolveRoot } from './paths.mjs';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const SETTINGS_PATH = path.join(ROOT, 'config', 'llm_settings.local.json');
+const SETTINGS_PATH = path.join(resolveRoot(), 'config', 'llm_settings.local.json');
 
 export const PROVIDERS = ['mock', 'anthropic', 'openai'];
 const MASK = '••••••••';

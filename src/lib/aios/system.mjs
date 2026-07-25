@@ -1,6 +1,5 @@
 // AIOS System entry point
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { Bus } from './bus.mjs';
 import { Store } from './store.mjs';
 import { Registry } from './registry.mjs';
@@ -17,9 +16,10 @@ import { AutonomyPolicy, ApprovalQueue } from './autonomy.mjs';
 import { createRunner as createMockRunner } from './runners/mock.mjs';
 import { createRunner as createLlmRunner } from './runners/claude.mjs';
 import { getSettings } from './settings.mjs';
+import { resolveRoot } from './paths.mjs';
 
-// Repo root, independent of process.cwd(): src/lib/aios/ -> ../../..
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+// AIOS data root: AIOS_ROOT env (containers/volumes) or the repo root.
+const ROOT = resolveRoot();
 
 /**
  * System singleton. Stored on globalThis so Next.js HMR and every route
