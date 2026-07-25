@@ -2225,3 +2225,487 @@ textarea {
   color: var(--accent);
   margin-bottom: 6px;
 }
+
+/* --- Modalità operative + Consegna ----------------------------------------- */
+
+/* Selettore di modalità (GoalComposer + chat dell'orchestratore).
+   `--mode-color` arriva inline dal componente: sul contenitore è il colore
+   della modalità attiva, su ogni chip quello della propria modalità. */
+.mode-selector {
+  --mode-color: var(--accent);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+/* Nel compositore il selettore sta fra intestazione e textarea. */
+.goal-composer .mode-selector {
+  margin-bottom: 14px;
+}
+
+.mode-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mode-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.mode-chip:hover:not(.on):not(:disabled) {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.mode-chip:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.mode-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Chip attiva: il colore della modalità è l'accento (bordo + tinta + barra). */
+.mode-chip.on {
+  border-color: var(--mode-color);
+  background: color-mix(in srgb, var(--mode-color) 12%, var(--surface));
+  color: var(--text);
+  box-shadow: inset 0 -2px 0 0 var(--mode-color);
+}
+
+.mode-chip-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.mode-chip-label {
+  line-height: 1.2;
+}
+
+.mode-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 10px;
+  border-left: 3px solid var(--mode-color);
+}
+
+.mode-hint-tagline {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mode-hint-desc {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.mode-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mode-tool {
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+/* Tool dichiarato dalla modalità ma non concesso all'agente. */
+.mode-tool.off {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+  text-decoration: line-through;
+}
+
+/* Badge di modalità sulle bolle di chat non orchestranti. */
+.mode-badge {
+  align-self: flex-start;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.66rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Risposta diretta delle modalità non orchestranti, sotto il compositore. */
+.mode-result {
+  margin-top: 18px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.mode-result .card-header {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mode-result .card-body {
+  max-height: 460px;
+}
+
+/* Bottone «📦 Consegna» in topbar. */
+.topbar-delivery {
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+/* Pannello Consegna: readiness a colpo d'occhio. */
+.delivery-hero {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding: 20px 24px;
+}
+
+.delivery-score {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 220px;
+  min-width: 200px;
+}
+
+.delivery-score-num {
+  font-size: 2.4rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.delivery-score-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+/* `.progress-track` è `flex: 1`: in colonna crescerebbe in altezza. */
+.delivery-score .progress-track {
+  flex: 0 0 auto;
+  height: 8px;
+  margin-top: 12px;
+}
+
+.delivery-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(96px, 1fr));
+  gap: 12px;
+  flex: 2 1 320px;
+}
+
+.delivery-section,
+.delivery-preview {
+  overflow: hidden;
+}
+
+.delivery-section .card-header {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.delivery-select-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.delivery-select-actions .btn {
+  padding: 6px 12px;
+  font-size: 0.76rem;
+}
+
+.delivery-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.delivery-item,
+.delivery-gap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--radius-sm);
+}
+
+.delivery-item.ready {
+  border-left-color: var(--success);
+}
+
+.delivery-item.partial {
+  background: var(--surface-muted);
+  border-left-color: var(--warning);
+}
+
+.delivery-gap {
+  border-left-color: var(--danger);
+}
+
+.delivery-item-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.delivery-item-main input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.delivery-item-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.delivery-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.delivery-item-source {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.delivery-item-note {
+  font-size: 0.76rem;
+  color: var(--warning);
+}
+
+.delivery-item-path {
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-align: left;
+  word-break: break-all;
+  cursor: pointer;
+}
+
+.delivery-item-path:hover {
+  text-decoration: underline;
+}
+
+.delivery-item-path:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.delivery-kind {
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.delivery-gap-reason {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.delivery-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.delivery-input,
+.delivery-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  outline: none;
+}
+
+.delivery-textarea {
+  resize: vertical;
+}
+
+.delivery-input:focus,
+.delivery-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.delivery-input:disabled,
+.delivery-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.delivery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Il percorso del dossier appena scritto sta nel badge dell'intestazione. */
+.delivery-preview .card-header .badge {
+  display: inline-block;
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+}
+
+.delivery-preview .card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 560px;
+}
+
+.delivery-prev-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.delivery-prev-row {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.delivery-prev-row:hover {
+  border-color: var(--accent);
+}
+
+.delivery-prev-row:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  .delivery-hero {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* In colonna il flex-basis diventa un'ALTEZZA: azzerarlo come per
+     `.progress-track`, o la hero cresce a ~600px di vuoto. */
+  .delivery-score,
+  .delivery-kpis {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+
+  /* Evita che le 3 tracce da 96px sfondino la card sui telefoni. */
+  .delivery-kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .delivery-score-num {
+    font-size: 2rem;
+  }
+
+  .delivery-item,
+  .delivery-gap {
+    padding: 12px;
+  }
+
+  .delivery-preview .card-header .badge {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .mode-selector {
+    padding: 10px 12px;
+  }
+
+  .mode-chip {
+    padding: 6px 10px;
+    font-size: 0.74rem;
+  }
+
+  .delivery-kpis {
+    gap: 8px;
+  }
+
+  .delivery-select-actions .btn {
+    flex: 1;
+  }
+}

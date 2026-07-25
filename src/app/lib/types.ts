@@ -235,6 +235,8 @@ export type AgentChatMessage = {
     by: string;
     role: 'user' | 'agent';
     text: string;
+    /** Modalità operativa attiva al momento del turno. Assente nelle voci di storico precedenti. */
+    mode?: string;
 };
 
 export type AgentChatResponse = {
@@ -334,3 +336,54 @@ export type PMChecklistToggle = {
     item_id: string;
     checked: boolean;
 };
+
+// --- Modalità operative dell'orchestratore -----------------------------------
+
+export type ModeId = 'orchestrator' | 'architect' | 'code' | 'ask' | 'debug';
+
+export type OperatingMode = {
+    id: ModeId;
+    label: string;
+    icon: string;
+    color: string;
+    tagline: string;
+    description: string;
+    orchestrates: boolean;
+    tools: string[] | null;
+    allow_writes: boolean;
+    placeholder: string;
+    cta: string;
+};
+
+// --- Consegna ----------------------------------------------------------------
+
+export type DeliveryItem = {
+    id: string;
+    title: string;
+    kind: 'report' | 'output' | 'knowledge';
+    status: 'ready' | 'partial';
+    path: string | null;
+    department: string | null;
+    source: string | null;
+    updated_at: string | null;
+    size: number | null;
+    note: string | null;
+};
+
+export type DeliveryGap = { id: string; label: string; reason: string; task_id: string | null; department: string | null };
+
+export type DeliveryGoal = { id: string; text: string; status: string; report_path: string | null; ready: boolean };
+
+export type DeliveryFile = { path: string; name: string; size: number; mtime: string };
+
+export type DeliverySnapshot = {
+    project: ProjectMeta;
+    generated_at: string;
+    readiness: { score: number | null; ready: number; partial: number; missing: number };
+    items: DeliveryItem[];
+    gaps: DeliveryGap[];
+    goals: DeliveryGoal[];
+    previous: DeliveryFile[];
+};
+
+export type DeliveryResult = { path: string; content: string };

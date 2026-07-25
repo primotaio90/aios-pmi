@@ -8,6 +8,7 @@ import { McpGateway } from './gateway.mjs';
 import { Lifecycle } from './lifecycle.mjs';
 import { Engine } from './engine.mjs';
 import { ProjectManager } from './pm.mjs';
+import { DeliveryDesk } from './delivery.mjs';
 import { AgentChat } from './chat.mjs';
 import { AgentEditor } from './agentEdit.mjs';
 import { Auth } from './auth.mjs';
@@ -112,7 +113,8 @@ async function build() {
   }
   const engine = new Engine({ registry, store, bus, tasks, gateway, lifecycle, runner });
   const pm = new ProjectManager({ registry, store, bus, tasks, engine });
-  pm.start(); // subscribe to goal.*/task.* and emit pm.* notifications
+  pm.start(); // subscribe to goal.*/task.*/delivery.* and emit pm.* notifications
+  const delivery = new DeliveryDesk({ registry, store, bus, tasks, engine, gateway, reportUsage });
   const chat = new AgentChat({ registry, store, gateway, bus });
   const agentEditor = new AgentEditor({ registry, gateway, bus });
   const auth = new Auth(path.join(ROOT, 'config', 'users.json'));
@@ -146,6 +148,7 @@ async function build() {
     lifecycle,
     engine,
     pm,
+    delivery,
     chat,
     agentEditor,
     auth,

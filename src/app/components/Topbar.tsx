@@ -10,6 +10,8 @@ export function Topbar({
     onSelect,
     onCreate,
     connected,
+    deliveryEnabled,
+    onOpenDelivery,
     pmEnabled,
     onOpenPM,
     onOpenSettings,
@@ -21,6 +23,8 @@ export function Topbar({
     onSelect: (id: string) => void;
     onCreate: (input: { name: string; client?: string; description?: string }) => Promise<void>;
     connected: boolean;
+    deliveryEnabled: boolean;
+    onOpenDelivery: () => void;
     pmEnabled: boolean;
     onOpenPM: () => void;
     onOpenSettings: () => void;
@@ -84,6 +88,16 @@ export function Topbar({
                     <span className="pulse-dot"></span>
                     {connected ? 'live' : 'riconnessione…'}
                 </span>
+
+                <button
+                    type="button"
+                    className="btn btn-primary topbar-delivery"
+                    title="Cosa possiamo già consegnare al cliente"
+                    onClick={onOpenDelivery}
+                    disabled={!deliveryEnabled}
+                >
+                    📦 Consegna
+                </button>
 
                 <button
                     type="button"

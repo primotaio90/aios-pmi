@@ -15,6 +15,11 @@ export class McpDeniedError extends Error {
  *
  * transport "internal" = deterministic in-process handlers (no network).
  * transport "stdio" is a declared extension point, not implemented here.
+ *
+ * On top of the whitelist, a caller may narrow the surface for a single call via
+ * opts.allow (see modes.mjs): the operating mode selected by the consultant can
+ * only SUBTRACT from the agent's mcp_whitelist, never extend it. A tool outside
+ * opts.allow is denied and audited with the active mode.
  */
 export class McpGateway {
   constructor(configPath, store, bus, tasks) {
@@ -41,8 +46,12 @@ export class McpGateway {
     return this.config.servers?.[server]?.tools?.[tool] || null;
   }
 
-  /** Executes a tool call on behalf of an agent, enforcing its whitelist. */
-  async call(projectId, agentId, tool, payload = {}) {
+  /**
+   * Executes a tool call on behalf of an agent, enforcing its whitelist and —
+   * when provided — the narrower set allowed by the active operating mode
+   * (opts: { allow?: string[], mode?: string, reason?: string }).
+   */
+  async call(projectId, agentId, tool, payload = {}, opts = {}) {
     const started = Date.now();
     const agent = this.registry?.get(agentId);
 
@@ -69,6 +78,12 @@ export class McpGateway {
     }
     if (!agent.mcp_whitelist.includes(tool)) {
       await log('denied', { error: 'fuori whitelist' });
+      throw new McpDeniedError(agentId, tool);
+    }
+    // Mode restriction: subtractive only — opts.allow is already a subset of the
+    // whitelist (computed by modes.effectiveTools), so this can never grant.
+    if (Array.isArray(opts.allow) && !opts.allow.includes(tool)) {
+      await log('denied', { error: opts.reason || 'fuori dalla modalità attiva', mode: opts.mode || null });
       throw new McpDeniedError(agentId, tool);
     }
 

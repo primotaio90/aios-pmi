@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, useEventStream } from './lib/api';
-import type { BusEvent, OverviewResponse, ProjectMeta, SessionUser, Toast } from './lib/types';
+import type { BusEvent, ModeId, OperatingMode, OverviewResponse, ProjectMeta, SessionUser, Toast } from './lib/types';
 import { Login } from './components/Login';
 import { Topbar } from './components/Topbar';
 import { HomeGrid } from './components/HomeGrid';
@@ -11,6 +11,7 @@ import { GoalComposer } from './components/GoalComposer';
 import { PMConsole } from './components/PMConsole';
 import { SettingsPanel } from './components/SettingsPanel';
 import { AgentChat } from './components/AgentChat';
+import { DeliveryPanel } from './components/DeliveryPanel';
 import { ToastStack } from './components/Toast';
 import { initials } from './lib/text';
 
@@ -23,9 +24,17 @@ export default function Dashboard() {
   const [openDirector, setOpenDirector] = useState<string | null>(null);
   const [openPM, setOpenPM] = useState(false);
   const [openSettings, setOpenSettings] = useState(false);
+  const [openDelivery, setOpenDelivery] = useState(false);
   const [chatAgent, setChatAgent] = useState<string | null>(null);
   const [orchestrating, setOrchestrating] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  // Operating modes: static catalogue + the orchestrator's own whitelist (to mark
+  // the tools a mode declares but the agent has not been granted).
+  const [modes, setModes] = useState<OperatingMode[]>([]);
+  const [mode, setMode] = useState<ModeId>('orchestrator');
+  // undefined = whitelist unknown (still loading / fetch failed): ModeSelector
+  // then marks nothing. An empty [] would wrongly mean "the agent has no tools".
+  const [orchestratorTools, setOrchestratorTools] = useState<string[] | undefined>(undefined);
 
   const current = projects.find((p) => p.id === projectId) ?? null;
   const { events, connected } = useEventStream(projectId);
@@ -46,6 +55,17 @@ export default function Dashboard() {
         if (ps.length > 0) setProjectId((cur) => cur ?? ps[0].id);
       })
       .catch(() => setProjects([]));
+  }, [user]);
+
+  // --- operating modes catalogue (once per session) -----------------------
+  useEffect(() => {
+    if (!user) return;
+    api.modes()
+      .then((ms) => setModes(ms))
+      .catch(() => setModes([]));
+    api.agents()
+      .then((reg) => setOrchestratorTools(reg.agents.find((a) => a.level === 'orchestrator')?.mcp_whitelist))
+      .catch(() => setOrchestratorTools(undefined));
   }, [user]);
 
   // --- overview loading + refresh ----------------------------------------
@@ -109,9 +129,18 @@ export default function Dashboard() {
     }
     // Lightweight refresh on any meaningful mutation event.
     if (
-      ['goal.created', 'goal.decomposed', 'goal.completed', 'goal.failed', 'task.created', 'task.status', 'file.updated', 'agent.spawned', 'agent.teardown'].includes(
-        evt.type
-      )
+      [
+        'goal.created',
+        'goal.decomposed',
+        'goal.completed',
+        'goal.failed',
+        'task.created',
+        'task.status',
+        'file.updated',
+        'agent.spawned',
+        'agent.teardown',
+        'delivery.produced',
+      ].includes(evt.type)
     ) {
       const t = setTimeout(reloadOverview, 250);
       return () => clearTimeout(t);
@@ -130,6 +159,7 @@ export default function Dashboard() {
     setOpenDirector(null);
     setOpenPM(false);
     setOpenSettings(false);
+    setOpenDelivery(false);
     setChatAgent(null);
   };
 
@@ -137,7 +167,16 @@ export default function Dashboard() {
     setOpenDirector(null);
     setOpenPM(false);
     setOpenSettings(false);
+    setOpenDelivery(false);
     setChatAgent(id);
+  }, []);
+
+  const openDeliveryPanel = useCallback(() => {
+    setOpenDirector(null);
+    setOpenPM(false);
+    setOpenSettings(false);
+    setChatAgent(null);
+    setOpenDelivery(true);
   }, []);
 
   const handleCreateProject = async (input: { name: string; client?: string; description?: string }) => {
@@ -159,6 +198,14 @@ export default function Dashboard() {
     }
   };
 
+  /** Non-orchestrating modes: one-shot question to the orchestrator, no goal created. */
+  const handleAskMode = async (text: string, modeId: ModeId): Promise<string> => {
+    const agentId = overview?.orchestrator?.id;
+    if (!projectId || !agentId) throw new Error('Orchestratore non disponibile');
+    const { reply } = await api.agentChat(projectId, agentId, text, modeId);
+    return reply;
+  };
+
   // --- render ------------------------------------------------------------
   if (user === undefined) {
     return <div className="boot">Caricamento AIOS…</div>;
@@ -167,6 +214,7 @@ export default function Dashboard() {
     return <Login onLogin={handleLogin} />;
   }
 
+  const orchestratorId = overview?.orchestrator?.id ?? null;
   const isOrchestrator = openDirector && overview?.orchestrator && openDirector === overview.orchestrator.id;
   const isDirector =
     openDirector && overview?.directors.some((d) => d.id === openDirector);
@@ -182,20 +230,25 @@ export default function Dashboard() {
           setOpenDirector(null);
           setOpenPM(false);
           setOpenSettings(false);
+          setOpenDelivery(false);
           setChatAgent(null);
         }}
         onCreate={handleCreateProject}
         connected={connected}
+        deliveryEnabled={Boolean(projectId)}
+        onOpenDelivery={openDeliveryPanel}
         pmEnabled={Boolean(current?.pm_enabled)}
         onOpenPM={() => {
           setOpenDirector(null);
           setOpenSettings(false);
+          setOpenDelivery(false);
           setChatAgent(null);
           setOpenPM(true);
         }}
         onOpenSettings={() => {
           setOpenDirector(null);
           setOpenPM(false);
+          setOpenDelivery(false);
           setChatAgent(null);
           setOpenSettings(true);
         }}
@@ -205,12 +258,15 @@ export default function Dashboard() {
       <main className="dashboard-main">
         {openSettings ? (
           <SettingsPanel onBack={() => setOpenSettings(false)} pushToast={pushToast} />
+        ) : openDelivery && projectId ? (
+          <DeliveryPanel project={projectId} onBack={() => setOpenDelivery(false)} pushToast={pushToast} />
         ) : chatAgent && projectId ? (
           <AgentChat
             project={projectId}
             agentId={chatAgent}
             onBack={() => setChatAgent(null)}
             pushToast={pushToast}
+            modes={modes}
           />
         ) : (
           <>
@@ -234,6 +290,12 @@ export default function Dashboard() {
             <GoalComposer
               busy={orchestrating}
               onSubmit={handleSubmitGoal}
+              modes={modes}
+              mode={mode}
+              onModeChange={setMode}
+              orchestratorTools={orchestratorTools}
+              onAskMode={handleAskMode}
+              onOpenChat={orchestratorId ? () => openChat(orchestratorId) : undefined}
             />
             <HomeGrid
               project={overview.project}
@@ -252,6 +314,7 @@ export default function Dashboard() {
             onBack={() => setOpenDirector(null)}
             onOpenDirector={(id) => setOpenDirector(id)}
             onChatAgent={openChat}
+            onOpenDelivery={openDeliveryPanel}
           />
         )}
 
@@ -288,12 +351,14 @@ function OrchestratorPanel({
   onBack,
   onOpenDirector,
   onChatAgent,
+  onOpenDelivery,
 }: {
   overview: OverviewResponse;
   events: BusEvent[];
   onBack: () => void;
   onOpenDirector: (id: string) => void;
   onChatAgent: (id: string) => void;
+  onOpenDelivery: () => void;
 }) {
   const o = overview.orchestrator!;
   const goal = o.active_goal;
@@ -311,9 +376,14 @@ function OrchestratorPanel({
           </h1>
           <div className="title-desc">Livello strategico · scomposizione e aggregazione report</div>
         </div>
-        <button className="btn btn-secondary" onClick={() => onChatAgent(o.id)}>
-          💬 Chat
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button className="btn btn-secondary" onClick={() => onChatAgent(o.id)}>
+            💬 Chat
+          </button>
+          <button className="btn btn-primary" onClick={onOpenDelivery} title="Cosa possiamo già consegnare al cliente">
+            📦 Consegna
+          </button>
+        </div>
       </div>
 
       <div className="panel-grid panel-grid-1">
