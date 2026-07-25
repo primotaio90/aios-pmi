@@ -12,6 +12,7 @@ import { PMConsole } from './components/PMConsole';
 import { SettingsPanel } from './components/SettingsPanel';
 import { AgentChat } from './components/AgentChat';
 import { DeliveryPanel } from './components/DeliveryPanel';
+import { ApprovalsPanel } from './components/ApprovalsPanel';
 import { AgentsSidebar } from './components/AgentsSidebar';
 import { ToastStack } from './components/Toast';
 import { initials } from './lib/text';
@@ -26,6 +27,7 @@ export default function Dashboard() {
   const [openPM, setOpenPM] = useState(false);
   const [openSettings, setOpenSettings] = useState(false);
   const [openDelivery, setOpenDelivery] = useState(false);
+  const [openApprovals, setOpenApprovals] = useState(false);
   const [chatAgent, setChatAgent] = useState<string | null>(null);
   const [orchestrating, setOrchestrating] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -226,6 +228,7 @@ export default function Dashboard() {
     setOpenPM(false);
     setOpenSettings(false);
     setOpenDelivery(false);
+    setOpenApprovals(false);
     setChatAgent(null);
   };
 
@@ -234,6 +237,7 @@ export default function Dashboard() {
     setOpenPM(false);
     setOpenSettings(false);
     setOpenDelivery(false);
+    setOpenApprovals(false);
     setChatAgent(id);
   }, []);
 
@@ -241,8 +245,20 @@ export default function Dashboard() {
     setOpenDirector(null);
     setOpenPM(false);
     setOpenSettings(false);
+    setOpenApprovals(false);
     setChatAgent(null);
     setOpenDelivery(true);
+  }, []);
+
+  // Fase A: the pending-approvals queue is a real, persistent panel — not a
+  // pointer to the ephemeral toasts (the bug this fixes).
+  const openApprovalsPanel = useCallback(() => {
+    setOpenDirector(null);
+    setOpenPM(false);
+    setOpenSettings(false);
+    setOpenDelivery(false);
+    setChatAgent(null);
+    setOpenApprovals(true);
   }, []);
 
   const handleCreateProject = async (input: { name: string; client?: string; description?: string }) => {
@@ -295,13 +311,14 @@ export default function Dashboard() {
         onToggleSidebar={() => setSidebarOpen((v) => !v)}
         agentsCount={allAgents.length}
         pendingApprovals={pendingApprovals}
-        onOpenApprovals={() => pushToast({ level: 'info', message: `${pendingApprovals} approvazioni in attesa: guarda i toast qui sotto` })}
+        onOpenApprovals={openApprovalsPanel}
         onSelect={(id) => {
           setProjectId(id);
           setOpenDirector(null);
           setOpenPM(false);
           setOpenSettings(false);
           setOpenDelivery(false);
+          setOpenApprovals(false);
           setChatAgent(null);
         }}
         onCreate={handleCreateProject}
@@ -313,6 +330,7 @@ export default function Dashboard() {
           setOpenDirector(null);
           setOpenSettings(false);
           setOpenDelivery(false);
+          setOpenApprovals(false);
           setChatAgent(null);
           setOpenPM(true);
         }}
@@ -320,6 +338,7 @@ export default function Dashboard() {
           setOpenDirector(null);
           setOpenPM(false);
           setOpenDelivery(false);
+          setOpenApprovals(false);
           setChatAgent(null);
           setOpenSettings(true);
         }}
@@ -346,6 +365,13 @@ export default function Dashboard() {
         <main className="dashboard-main">
           {openSettings ? (
             <SettingsPanel onBack={() => setOpenSettings(false)} pushToast={pushToast} />
+          ) : openApprovals && projectId ? (
+            <ApprovalsPanel
+              project={projectId}
+              onBack={() => setOpenApprovals(false)}
+              pushToast={pushToast}
+              modes={modes}
+            />
           ) : openDelivery && projectId ? (
             <DeliveryPanel project={projectId} onBack={() => setOpenDelivery(false)} pushToast={pushToast} />
           ) : chatAgent && projectId ? (

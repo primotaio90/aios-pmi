@@ -74,7 +74,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const session = body.session === true;
 
     try {
-        // Session override: in-memory only, never persisted.
+        // Session override: in-memory only, never persisted. It is the
+        // "approve for this session" lever (strada A): it can only LOOSEN the
+        // durable policy (ask → auto), never add restrictions and never go
+        // below the mode floor — resolvePolicy enforces that, so only the
+        // `auto` list is meaningful here; ask/never entries are accepted but
+        // have no effect by design.
         if (session) {
             if (!project) return bad('Un override di sessione richiede il campo "project"');
             sys.autonomy.setSessionOverride(project, agent, lists);

@@ -545,20 +545,27 @@ never_approve: []
 
 Il mini-glob (`**` = qualsiasi sequenza incluse `/`, `*` = sequenza senza `/`) è
 interno a `autonomy.mjs`, senza dipendenze. Una voce con glob matcha solo quando
-`payload.path` cade nel glob; senza glob la voce vale per tutto il tool.
+`payload.path` cade nel glob; senza glob la voce vale per tutto il tool. Un glob
+che termina in `/**` matcha anche la directory nuda: `outputs/**` ≡ `outputs`,
+compilato come `^outputs(/.*)?$`.
 
-**Sorgenti in risoluzione (ognuna può solo inasprire la precedente):**
+**Sorgenti in risoluzione:**
 
 1. **floor della modalità** (`autonomyFloor(modeId)`, da `modes.mjs`): es. Architetto
    pone `filesystem.fs_write: never`, Code lo pone `ask`, Orchestratore `{}`.
+   È l'unico **invalicabile**: nessuna sorgente può allentarlo.
 2. **frontmatter dell'agente** (`auto_approve`/`ask_approve`/`never_approve`).
 3. **override per tenant** (`projects/<id>/state/autonomy.json`, stesso schema, ha
    precedenza sul frontmatter).
-4. **override di sessione** («approva sempre per stavolta»): solo in memoria, mai su disco.
+4. **override di sessione** («approva per questa sessione»): solo in memoria, mai su disco.
 
-Per ogni chiamata `resolvePolicy()` raccoglie il voto di ogni sorgente (la sua voce
-matching più restrittiva) e prende il **massimo** di restrittività
-(`auto`<`ask`<`never`). Una sorgente senza voce matching è neutra.
+Per ogni chiamata `resolvePolicy()` calcola prima il **livello durevole** =
+`mostRestrictive(floor, frontmatter, tenant)` (dentro ogni sorgente vince la voce
+matching più restrittiva; una sorgente senza voce matching è neutra). La **sessione**
+è l'unica che può **allentare**, ma con due limiti duri: rilassa solo `ask → auto`
+(mai rimuovere un `never`) e **mai** sotto il floor della modalità. Così l'Architetto
+(floor `fs_write: never`) non scrive comunque, qualunque cosa dica la sessione; e la
+sessione non può aggiungere restrizioni che il livello durevole non aveva.
 
 **Enforcement nel gateway** (3º cancello, dopo whitelist e modalità, prima di
 `#dispatch`): `never` → log `denied` (`error: 'vietato dalla policy di autonomia'`) +
@@ -574,7 +581,14 @@ Emette `mcp.approval_required` sul bus (l'SSE trasporta già qualsiasi `type`,
 `resolve(project, id, approved, byUser)` chiude (emettendo `mcp.approval_resolved`).
 Timeout: `120_000` ms in una run non presidiata, `null` (attesa indefinita) quando la
 chiamata arriva da `chat.mjs` — il contesto è passato esplicitamente
-(`opts.context: 'unattended' | 'interactive'`).
+(`opts.context: 'unattended' | 'interactive'`). `pendingList()`/`list()` leggono
+attraverso la catena di serializzazione per progetto (mai uno stato mezzo scritto).
+
+**Orfane dopo un restart**: i resolver vivono in memoria, i record su disco. Dopo un
+riavvio una `pending` persistita non ha più nessuno che la attende: al boot
+(`system.mjs`) `markOrphans()` la marca `stale`, così il pannello la mostra come
+interrotta invece di un bottone che non fa nulla. Risolverla sposta solo lo stato
+persistito; non sblocca nessuna chiamata (è già morta col processo).
 
 **Fallback su run non presidiata** (niente di inventato): se un'approvazione scade
 dentro `engine.#runExpert`, la `McpDeniedError` porta il task in `blocked` — stato
@@ -595,8 +609,11 @@ conferma» funziona in chat interattiva, nelle run lunghe degrada sul fallback
   (con `?project=` include l'override tenant effettivo).
 - `POST /api/agents/:a/autonomy` `{auto, ask, never, project?, session?}`: senza
   `project` scrive il frontmatter (hot-reload); con `project` scrive l'override
-  tenant; con `session: true` solo in memoria.
-- `GET /api/projects/:p/approvals` → `{approvals}` pendenti (più recenti prima).
+  tenant; con `session: true` solo in memoria. La sessione è il ramo «approva per
+  questa sessione»: può solo allentare (`ask → auto`), quindi solo la lista `auto`
+  ha effetto; `ask`/`never` in sessione sono accettate ma ignorate per design.
+- `GET /api/projects/:p/approvals` → `{approvals}` pendenti live (più recenti prima);
+  con `?all=1` anche lo storico recente (incluse `stale` e risolte).
 - `POST /api/projects/:p/approvals` `{id, approved}` → risolve la chiamata in attesa
   (404 se id sconosciuto o già deciso; la decisione è idempotente).
 
@@ -604,4 +621,9 @@ conferma» funziona in chat interattiva, nelle run lunghe degrada sul fallback
 con tool esistente nel catalogo) e le scrive nel frontmatter, accanto a
 `setWhitelist()`. UI: tab «Autonomia» in `AgentChat.tsx` (controllo a 3 stati per
 tool, raggruppato per server, con profili rapidi), sezione matrice in
-`SettingsPanel.tsx`, badge pendenti in `Topbar.tsx` con toast Approva/Nega.
+`SettingsPanel.tsx`. Le approvazioni pendenti sono raggiungibili da un **pannello
+persistente** (`ApprovalsPanel.tsx`, aperto dal badge 🔔 in `Topbar.tsx`) che legge
+sempre `GET …/approvals`: sopravvive a F5 e a raffiche di toast, mostra per ogni
+richiesta agente, tool, modalità e payload (path in evidenza per `fs_write`), con
+Approva / Nega / **Approva per sessione**. I toast con azioni inline restano come
+scorciatoia, ma non sono più l'unica via.

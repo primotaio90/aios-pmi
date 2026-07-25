@@ -276,7 +276,7 @@ export type Approval = {
     tool: string;
     payload: Record<string, unknown>;
     mode: string | null;
-    status: 'pending' | 'approved' | 'denied' | 'timeout';
+    status: 'pending' | 'approved' | 'denied' | 'timeout' | 'stale';
     decided_by: string | null;
     decided_at: string | null;
 };

@@ -181,9 +181,16 @@ export const api = {
         return asJson(res) as Promise<AutonomyResponse>;
     },
 
-    /** Approvazioni in coda per un tenant (le chiamate `ask` in attesa). */
+    /** Approvazioni in coda per un tenant (le chiamate `ask` in attesa, live). */
     async approvals(project: string): Promise<Approval[]> {
         const res = await fetch(`/api/projects/${encodeURIComponent(project)}/approvals`, { cache: 'no-store' });
+        const body = await asJson(res);
+        return (body as { approvals: Approval[] }).approvals ?? [];
+    },
+
+    /** Storico recente delle approvazioni (incluse stale/risolte) per il pannello. */
+    async approvalsAll(project: string): Promise<Approval[]> {
+        const res = await fetch(`/api/projects/${encodeURIComponent(project)}/approvals?all=1`, { cache: 'no-store' });
         const body = await asJson(res);
         return (body as { approvals: Approval[] }).approvals ?? [];
     },

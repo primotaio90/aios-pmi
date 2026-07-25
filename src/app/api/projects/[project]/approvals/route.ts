@@ -27,7 +27,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     try {
-        return Response.json({ approvals: await sys.approvals.pendingList(project) });
+        // `?all=1` returns the recent history (incl. stale/resolved) for the panel;
+        // the default stays the live pending queue (backwards compatible).
+        const all = request.nextUrl.searchParams.get('all') === '1';
+        const approvals = all ? await sys.approvals.list(project) : await sys.approvals.pendingList(project);
+        return Response.json({ approvals });
     } catch (err) {
         return bad(String((err as Error).message || err), 500);
     }

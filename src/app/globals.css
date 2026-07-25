@@ -3371,3 +3371,124 @@ textarea {
 .autonomy-expand-body>.glass.panel-block {
   background: var(--surface);
 }
+
+/* --- Coda approvazioni (Fase A, pannello persistente) ---------------------- */
+
+.approval-item {
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.approval-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.approval-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.approval-tool {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.approval-ts {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* Il path in evidenza: è l'informazione su cui l'umano decide. */
+.approval-path {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  word-break: break-all;
+}
+
+.approval-path-inline {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+.approval-rest {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  word-break: break-all;
+}
+
+.approval-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.approval-actions .btn {
+  white-space: nowrap;
+  font-size: 0.78rem;
+  padding: 6px 12px;
+}
+
+.approval-session {
+  color: var(--accent);
+}
+
+.approval-deny {
+  color: var(--error);
+}
+
+.approval-status {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.approval-status.status-approved {
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.approval-status.status-denied,
+.approval-status.status-timeout {
+  color: var(--error);
+  border-color: var(--error);
+}
+
+.approval-status.status-stale {
+  color: var(--text-muted);
+  border-style: dashed;
+}
+
+/* Una richiesta interrotta da un riavvio è de-enfatizzata. */
+.approval-item.approval-stale {
+  opacity: 0.65;
+}
+
+@media (min-width: 720px) {
+  .approval-actions {
+    flex-direction: row;
+  }
+}
