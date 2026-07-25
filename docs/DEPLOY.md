@@ -114,6 +114,18 @@ Vercel esegue le API route come **funzioni serverless**:
 | Submit di un goal | ✅ | ❌ non persiste |
 | SSE event bus | ✅ | ⚠️ inaffidabile |
 | Log JSONL | ✅ | ❌ non scrivibili |
+| Regole di autonomia (`state/autonomy.json`, frontmatter) | ✅ | ❌ non persistono |
+| Pacchetti di consegna (`outputs/consegna_*.md`) | ✅ | ❌ non persistono |
+| Coda approvazioni (`state/approvals.json`) | ✅ | ⚠️ vedi nota sotto |
+
+> **Nota autonomia (Fase A) e consegna (Fase C) su serverless.** Come per
+> settings/note/whitelist (§4), su FS read-only le regole di autonomia e i dossier di
+> consegna non persistono in produzione. In più, l'`await` **bloccante** di
+> un'approvazione non sopravvive fra due invocation lambda distinte: in produzione il
+> flusso «chiedi conferma» funziona nella chat interattiva (stessa invocation che
+> attende la risposta SSE), mentre nelle run lunghe non presidiate la richiesta va in
+> timeout e degrada sul fallback esistente `blocked` + notifica PM — esattamente il
+> comportamento previsto in assenza di un umano che risponde.
 
 ### Conclusione
 Per una **demo / prova della piattaforma** su Vercel, l'app si avvia, la dashboard

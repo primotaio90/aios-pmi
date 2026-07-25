@@ -202,9 +202,12 @@ export class Engine {
       instance = this.lifecycle.spawn(projectId, expert.id, director.id, task.id);
       await this.tasks.transition(projectId, task.id, 'in_progress', expert.id);
 
-      // Tool facade bound to this expert: whitelist enforcement lives in the gateway.
+      // Tool facade bound to this expert: whitelist enforcement lives in the
+      // gateway. `context: 'unattended'` tells the autonomy gate (Fase A) that an
+      // `ask` here must wait at most the queue timeout, then the task falls back
+      // to the existing `blocked` state (never hangs a background run).
       const tools = {
-        call: (tool, payload) => this.gateway.call(projectId, expert.id, tool, payload),
+        call: (tool, payload) => this.gateway.call(projectId, expert.id, tool, payload, { context: 'unattended' }),
       };
       const result = await this.runner.runExpert(projectId, expert, task, goal.text, tools);
 
@@ -289,16 +292,16 @@ export class Engine {
       project,
       orchestrator: orchestratorAgent
         ? {
-            id: orchestratorAgent.id,
-            name: orchestratorAgent.name,
-            icon: orchestratorAgent.icon,
-            color: orchestratorAgent.color,
-            status: activeGoal && activeGoal.status !== 'completed' && activeGoal.status !== 'failed' ? 'orchestrating' : 'idle',
-            progress: progresses.length ? Math.round(progresses.reduce((a, b) => a + b, 0) / progresses.length) : null,
-            active_goal: activeGoal
-              ? { id: activeGoal.id, text: activeGoal.text, status: activeGoal.status, macro_goals: activeGoal.macro_goals, report_path: activeGoal.report_path }
-              : null,
-          }
+          id: orchestratorAgent.id,
+          name: orchestratorAgent.name,
+          icon: orchestratorAgent.icon,
+          color: orchestratorAgent.color,
+          status: activeGoal && activeGoal.status !== 'completed' && activeGoal.status !== 'failed' ? 'orchestrating' : 'idle',
+          progress: progresses.length ? Math.round(progresses.reduce((a, b) => a + b, 0) / progresses.length) : null,
+          active_goal: activeGoal
+            ? { id: activeGoal.id, text: activeGoal.text, status: activeGoal.status, macro_goals: activeGoal.macro_goals, report_path: activeGoal.report_path }
+            : null,
+        }
         : null,
       directors,
     };

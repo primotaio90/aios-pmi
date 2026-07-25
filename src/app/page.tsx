@@ -97,11 +97,56 @@ export default function Dashboard() {
   }, [projectId, reloadOverview]);
 
   // --- SSE → toasts + live refresh ---------------------------------------
+  // I toast normali scadono da soli; quelli di approvazione (Fase A) restano
+  // finché il consulente non sceglie Approva/Nega.
   const pushToast = useCallback((t: Omit<Toast, 'id'>) => {
     const id = Math.random().toString(36).slice(2);
     setToasts((prev) => [...prev, { ...t, id }].slice(-5));
-    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 6000);
+    if (!t.approval) {
+      setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 6000);
+    }
   }, []);
+
+  // Approvazioni in coda per il badge in topbar (Fase A).
+  const [pendingApprovals, setPendingApprovals] = useState(0);
+  const reloadApprovals = useCallback(async () => {
+    if (!projectId) {
+      setPendingApprovals(0);
+      return;
+    }
+    try {
+      const list = await api.approvals(projectId);
+      setPendingApprovals(list.length);
+    } catch {
+      /* badge best-effort */
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    reloadApprovals();
+  }, [reloadApprovals]);
+
+  /** Risolve un'approvazione dal toast: la chiamata in attesa prosegue o è negata. */
+  const resolveApproval = useCallback(
+    async (toastId: string, approvalId: string, approved: boolean) => {
+      if (!projectId) return;
+      // Rimuovi subito il toast (ottimistico), poi conferma con l'API.
+      setToasts((prev) => prev.filter((x) => x.id !== toastId));
+      try {
+        await api.resolveApproval(projectId, approvalId, approved);
+        pushToast({
+          level: approved ? 'success' : 'warn',
+          message: approved ? 'Azione approvata' : 'Azione negata',
+        });
+      } catch (err) {
+        pushToast({ level: 'error', message: err instanceof ApiError ? err.message : 'Risoluzione fallita' });
+      } finally {
+        reloadApprovals();
+      }
+    },
+    [projectId, pushToast, reloadApprovals]
+  );
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -118,6 +163,9 @@ export default function Dashboard() {
       goal_id?: string;
       to?: string;
       status?: string;
+      id?: string;
+      agent?: string;
+      tool?: string;
     };
 
     if (evt.type === 'notify' && data.message) {
@@ -132,6 +180,18 @@ export default function Dashboard() {
     }
     if (evt.type === 'task.status' && data.status === 'blocked') {
       pushToast({ level: 'warn', message: `Task bloccato (${evt.agent ?? '—'})` });
+    }
+    // Fase A: una chiamata `ask` attende una decisione umana → toast con azioni.
+    if (evt.type === 'mcp.approval_required' && data.id) {
+      pushToast({
+        level: 'warn',
+        message: `${data.agent ?? evt.agent ?? 'Un agente'} chiede conferma per ${data.tool ?? 'un tool'}`,
+        approval: { id: data.id, agent: data.agent ?? evt.agent ?? '', tool: data.tool ?? '' },
+      });
+      reloadApprovals();
+    }
+    if (evt.type === 'mcp.approval_resolved') {
+      reloadApprovals();
     }
     // Lightweight refresh on any meaningful mutation event.
     if (
@@ -151,7 +211,7 @@ export default function Dashboard() {
       const t = setTimeout(reloadOverview, 250);
       return () => clearTimeout(t);
     }
-  }, [events, projectId, pushToast, reloadOverview]);
+  }, [events, projectId, pushToast, reloadOverview, reloadApprovals]);
 
   // --- actions -----------------------------------------------------------
   const handleLogin = (u: SessionUser) => setUser(u);
@@ -234,6 +294,8 @@ export default function Dashboard() {
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen((v) => !v)}
         agentsCount={allAgents.length}
+        pendingApprovals={pendingApprovals}
+        onOpenApprovals={() => pushToast({ level: 'info', message: `${pendingApprovals} approvazioni in attesa: guarda i toast qui sotto` })}
         onSelect={(id) => {
           setProjectId(id);
           setOpenDirector(null);
@@ -296,77 +358,81 @@ export default function Dashboard() {
             />
           ) : (
             <>
-          {!projectId && (
-            <div className="glass empty-state">
-              <h2>Benvenuto, {user.name.split(' ')[0]}</h2>
-              <p>Nessun progetto cliente presente. Crea il primo tenant dal pulsante + Nuovo in alto.</p>
-            </div>
-          )}
+              {!projectId && (
+                <div className="glass empty-state">
+                  <h2>Benvenuto, {user.name.split(' ')[0]}</h2>
+                  <p>Nessun progetto cliente presente. Crea il primo tenant dal pulsante + Nuovo in alto.</p>
+                </div>
+              )}
 
-          {projectId && overviewError && (
-            <div className="glass panel-state login-error">{overviewError}</div>
-          )}
+              {projectId && overviewError && (
+                <div className="glass panel-state login-error">{overviewError}</div>
+              )}
 
-          {projectId && !overview && !overviewError && (
-            <div className="glass panel-state">Caricamento progetto…</div>
-          )}
+              {projectId && !overview && !overviewError && (
+                <div className="glass panel-state">Caricamento progetto…</div>
+              )}
 
-          {projectId && overview && !openDirector && !openPM && (
-            <div className="home-wrap">
-              <GoalComposer
-                busy={orchestrating}
-                onSubmit={handleSubmitGoal}
-                modes={modes}
-                mode={mode}
-                onModeChange={setMode}
-                orchestratorTools={orchestratorTools}
-                onAskMode={handleAskMode}
-                onOpenChat={orchestratorId ? () => openChat(orchestratorId) : undefined}
-              />
-              <HomeGrid
-                project={overview.project}
-                orchestrator={overview.orchestrator}
-                directors={overview.directors}
-                onOpenDirector={(id) => setOpenDirector(id)}
-                onChatAgent={openChat}
-              />
-            </div>
-          )}
+              {projectId && overview && !openDirector && !openPM && (
+                <div className="home-wrap">
+                  <GoalComposer
+                    busy={orchestrating}
+                    onSubmit={handleSubmitGoal}
+                    modes={modes}
+                    mode={mode}
+                    onModeChange={setMode}
+                    orchestratorTools={orchestratorTools}
+                    onAskMode={handleAskMode}
+                    onOpenChat={orchestratorId ? () => openChat(orchestratorId) : undefined}
+                  />
+                  <HomeGrid
+                    project={overview.project}
+                    orchestrator={overview.orchestrator}
+                    directors={overview.directors}
+                    onOpenDirector={(id) => setOpenDirector(id)}
+                    onChatAgent={openChat}
+                  />
+                </div>
+              )}
 
-          {projectId && openDirector && isOrchestrator && overview?.orchestrator && (
-            <OrchestratorPanel
-              overview={overview}
-              events={events}
-              onBack={() => setOpenDirector(null)}
-              onOpenDirector={(id) => setOpenDirector(id)}
-              onChatAgent={openChat}
-              onOpenDelivery={openDeliveryPanel}
-            />
-          )}
+              {projectId && openDirector && isOrchestrator && overview?.orchestrator && (
+                <OrchestratorPanel
+                  overview={overview}
+                  events={events}
+                  onBack={() => setOpenDirector(null)}
+                  onOpenDirector={(id) => setOpenDirector(id)}
+                  onChatAgent={openChat}
+                  onOpenDelivery={openDeliveryPanel}
+                />
+              )}
 
-          {projectId && openDirector && isDirector && (
-            <DirectorPanel
-              project={projectId}
-              directorId={openDirector}
-              events={events}
-              onBack={() => setOpenDirector(null)}
-              onChatAgent={openChat}
-            />
-          )}
+              {projectId && openDirector && isDirector && (
+                <DirectorPanel
+                  project={projectId}
+                  directorId={openDirector}
+                  events={events}
+                  onBack={() => setOpenDirector(null)}
+                  onChatAgent={openChat}
+                />
+              )}
 
-          {projectId && openPM && (
-            <PMConsole project={projectId} events={events} onBack={() => setOpenPM(false)} />
-          )}
+              {projectId && openPM && (
+                <PMConsole project={projectId} events={events} onBack={() => setOpenPM(false)} />
+              )}
 
-          {projectId && openDirector && !isOrchestrator && !isDirector && (
-            <div className="glass panel-state login-error">Agente non valido come drill-down.</div>
-          )}
+              {projectId && openDirector && !isOrchestrator && !isDirector && (
+                <div className="glass panel-state login-error">Agente non valido come drill-down.</div>
+              )}
             </>
           )}
         </main>
       </div>
 
-      <ToastStack toasts={toasts} onDismiss={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
+      <ToastStack
+        toasts={toasts}
+        onDismiss={(id) => setToasts((p) => p.filter((t) => t.id !== id))}
+        onResolveApproval={resolveApproval}
+      />
     </div>
   );
 }

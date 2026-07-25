@@ -19,6 +19,8 @@ export function Topbar({
     sidebarOpen,
     onToggleSidebar,
     agentsCount,
+    pendingApprovals = 0,
+    onOpenApprovals,
 }: {
     user: SessionUser;
     projects: ProjectMeta[];
@@ -35,6 +37,9 @@ export function Topbar({
     sidebarOpen?: boolean;
     onToggleSidebar?: () => void;
     agentsCount?: number;
+    /** Richieste di approvazione in coda (Fase A): il badge compare solo se > 0. */
+    pendingApprovals?: number;
+    onOpenApprovals?: () => void;
 }) {
     const [creating, setCreating] = useState(false);
     const [name, setName] = useState('');
@@ -105,6 +110,17 @@ export function Topbar({
                     <span className="pulse-dot"></span>
                     {connected ? 'live' : 'riconnessione…'}
                 </span>
+
+                {pendingApprovals > 0 && (
+                    <button
+                        type="button"
+                        className="btn btn-secondary approvals-badge"
+                        title="Approvazioni in attesa: un agente chiede conferma prima di agire"
+                        onClick={onOpenApprovals}
+                    >
+                        🔔 {pendingApprovals}
+                    </button>
+                )}
 
                 <button
                     type="button"

@@ -28,6 +28,8 @@ export class McpGateway {
     this.bus = bus;
     this.tasks = tasks;
     this.registry = null; // set by system wiring
+    this.autonomy = null; // AutonomyPolicy, set by system wiring (Fase A)
+    this.approvals = null; // ApprovalQueue, set by system wiring (Fase A)
     this.config = { servers: {} };
   }
 
@@ -47,9 +49,13 @@ export class McpGateway {
   }
 
   /**
-   * Executes a tool call on behalf of an agent, enforcing its whitelist and —
-   * when provided — the narrower set allowed by the active operating mode
-   * (opts: { allow?: string[], mode?: string, reason?: string }).
+   * Executes a tool call on behalf of an agent, enforcing three gates in order:
+   * the whitelist, the narrower set allowed by the active operating mode
+   * (opts.allow) and the autonomy policy (Fase A). Every mcp.call line carries
+   * `policy` ('auto'|'approved'|'denied') and `approved_by` (string|null) as the
+   * audit trail of what the AI did alone vs what a human signed.
+   * opts: { allow?: string[], mode?: string, reason?: string,
+   *         context?: 'interactive'|'unattended', modeFloor?: object }.
    */
   async call(projectId, agentId, tool, payload = {}, opts = {}) {
     const started = Date.now();
@@ -63,6 +69,8 @@ export class McpGateway {
         payload,
         outcome,
         duration_ms: Date.now() - started,
+        policy: 'auto',
+        approved_by: null,
         ...extra,
       };
       this.bus.emitEvent(projectId, 'mcp.call', entry, agentId);
@@ -83,8 +91,51 @@ export class McpGateway {
     // Mode restriction: subtractive only — opts.allow is already a subset of the
     // whitelist (computed by modes.effectiveTools), so this can never grant.
     if (Array.isArray(opts.allow) && !opts.allow.includes(tool)) {
-      await log('denied', { error: opts.reason || 'fuori dalla modalità attiva', mode: opts.mode || null });
+      await log('denied', {
+        error: opts.reason || 'fuori dalla modalità attiva',
+        mode: opts.mode || null,
+        policy: 'denied',
+      });
       throw new McpDeniedError(agentId, tool);
+    }
+
+    // Autonomy gate (Fase A): among the tools that passed the previous two
+    // gates, which may start on their own? Default 'auto' → no behaviour change.
+    // The gate is skipped entirely when no policy module is wired (retro-compat).
+    if (this.autonomy) {
+      const policy = await this.autonomy.policyFor(projectId, agentId, tool, payload, opts.modeFloor || {});
+
+      if (policy === 'never') {
+        await log('denied', { error: 'vietato dalla policy di autonomia', policy: 'denied' });
+        throw new McpDeniedError(agentId, tool);
+      }
+
+      if (policy === 'ask') {
+        // An unattended run waits up to the queue timeout, then falls back to
+        // the engine's `blocked` state; an interactive chat waits indefinitely.
+        const timeoutMs = opts.context === 'interactive' ? null : undefined;
+        const decision = await this.approvals.request(projectId, agentId, tool, payload, {
+          timeoutMs,
+          mode: opts.mode || null,
+        });
+        if (!decision.approved) {
+          await log('denied', {
+            error: decision.reason === 'timeout' ? 'approvazione scaduta' : 'approvazione negata',
+            reason: decision.reason || 'denied',
+            policy: 'denied',
+          });
+          throw new McpDeniedError(agentId, tool);
+        }
+        // Approved by a human: proceed, flagged in the audit trail.
+        try {
+          const result = await this.#dispatch(projectId, agentId, tool, payload);
+          await log('ok', { result_preview: preview(result), policy: 'approved', approved_by: decision.by || null });
+          return { ok: true, result };
+        } catch (err) {
+          await log('error', { error: String(err.message || err), policy: 'approved', approved_by: decision.by || null });
+          return { ok: false, error: String(err.message || err) };
+        }
+      }
     }
 
     try {

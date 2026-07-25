@@ -5,8 +5,9 @@ import { api, ApiError } from '../lib/api';
 import type { AgentChatMessage, AgentMeta, AgentNote, Capability, ModeId, OperatingMode, Toast } from '../lib/types';
 import { initials } from '../lib/text';
 import { ModeSelector } from './ModeSelector';
+import { AutonomyPanel } from './AutonomyPanel';
 
-type Tab = 'chat' | 'notes' | 'tools';
+type Tab = 'chat' | 'notes' | 'tools' | 'autonomy';
 
 /**
  * Direct chat with a single agent + two durable editors:
@@ -203,6 +204,9 @@ export function AgentChat({
                 <button className={`view-tab ${tab === 'tools' ? 'active' : ''}`} onClick={() => setTab('tools')}>
                     Capacità ({current.length})
                 </button>
+                <button className={`view-tab ${tab === 'autonomy' ? 'active' : ''}`} onClick={() => setTab('autonomy')}>
+                    Autonomia
+                </button>
             </nav>
 
             {tab === 'chat' && (
@@ -308,6 +312,12 @@ export function AgentChat({
                             )}
                         </div>
                     </div>
+                </div>
+            )}
+
+            {tab === 'autonomy' && (
+                <div className="panel-grid panel-grid-1">
+                    <AutonomyPanel agentId={agentId} project={project} pushToast={pushToast} />
                 </div>
             )}
 

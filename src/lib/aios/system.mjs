@@ -1,3 +1,4 @@
+// AIOS System entry point
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Bus } from './bus.mjs';
@@ -12,6 +13,7 @@ import { DeliveryDesk } from './delivery.mjs';
 import { AgentChat } from './chat.mjs';
 import { AgentEditor } from './agentEdit.mjs';
 import { Auth } from './auth.mjs';
+import { AutonomyPolicy, ApprovalQueue } from './autonomy.mjs';
 import { createRunner as createMockRunner } from './runners/mock.mjs';
 import { createRunner as createLlmRunner } from './runners/claude.mjs';
 import { getSettings } from './settings.mjs';
@@ -119,6 +121,15 @@ async function build() {
   const agentEditor = new AgentEditor({ registry, gateway, bus });
   const auth = new Auth(path.join(ROOT, 'config', 'users.json'));
 
+  // Autonomy (Fase A): the third permission axis. The policy resolves what an
+  // agent may do alone; the queue parks `ask` calls until a human decides.
+  // Wiring them into the gateway activates the third gate (skipped when unset,
+  // so behaviour without this module is byte-for-byte the old one).
+  const autonomy = new AutonomyPolicy({ registry, store });
+  const approvals = new ApprovalQueue({ bus, store });
+  gateway.autonomy = autonomy;
+  gateway.approvals = approvals;
+
   // Persistence wiring: single writer for every audit log (no double logging).
   bus.subscribe((evt) => {
     if (!evt.project || evt.project === '*') return;
@@ -151,6 +162,8 @@ async function build() {
     delivery,
     chat,
     agentEditor,
+    autonomy,
+    approvals,
     auth,
   };
 }

@@ -29,6 +29,8 @@ export const MODES = [
     orchestrates: true,
     tools: null,
     allow_writes: true,
+    // Autonomy floor: in the base mode everything the agent already owns is auto.
+    autonomy_floor: {},
     placeholder: 'Descrivi l\'obiettivo del cliente (min 5 caratteri)…',
     cta: 'Avvia orchestrazione',
     overlay: [
@@ -50,6 +52,9 @@ export const MODES = [
     orchestrates: false,
     tools: ['filesystem.fs_read', 'filesystem.fs_list', 'research.web_search', 'diagram.mermaid_generate'],
     allow_writes: false,
+    // The Architect never writes: even if a future mode or whitelist granted it,
+    // the floor pushes fs_write to 'never' (most-restrictive wins).
+    autonomy_floor: { never: ['filesystem.fs_write'] },
     placeholder: 'Cosa vuoi progettare? Obiettivo, vincoli e contesto…',
     cta: 'Progetta il piano',
     overlay: [
@@ -78,6 +83,8 @@ export const MODES = [
       'diagram.mermaid_generate',
     ],
     allow_writes: true,
+    // Code may write, but every write asks for confirmation first.
+    autonomy_floor: { ask: ['filesystem.fs_write'] },
     placeholder: 'Descrivi la modifica da fare e su quali file…',
     cta: 'Esegui',
     overlay: [
@@ -99,6 +106,8 @@ export const MODES = [
     orchestrates: false,
     tools: ['filesystem.fs_read', 'filesystem.fs_list', 'research.web_search'],
     allow_writes: false,
+    // Ask explains, never modifies: every write tool is floored to 'never'.
+    autonomy_floor: { never: ['filesystem.fs_write', 'tasks.task_update'] },
     placeholder: 'Fai una domanda sul progetto, sui file o sul metodo…',
     cta: 'Chiedi',
     overlay: [
@@ -126,6 +135,8 @@ export const MODES = [
       'tasks.task_update',
     ],
     allow_writes: false,
+    // Debug proposes, does not apply: writes ask, and it never writes files itself.
+    autonomy_floor: { ask: ['filesystem.fs_write'] },
     placeholder: 'Descrivi il problema: cosa succede, cosa ti aspettavi, dove…',
     cta: 'Diagnostica',
     overlay: [
@@ -176,6 +187,22 @@ export function effectiveTools(agent, modeId) {
   if (mode.tools) tools = tools.filter((t) => mode.tools.includes(t));
   if (!mode.allow_writes) tools = tools.filter((t) => t !== 'filesystem.fs_write');
   return tools;
+}
+
+/**
+ * Autonomy floor of a mode ({ auto:[], ask:[], never:[] } of flat tool entries),
+ * normalized for AutonomyPolicy. The floor is the first — and least
+ * restrictive, being the baseline — source in the resolution chain; frontmatter,
+ * project and session overrides can only tighten it further.
+ */
+export function autonomyFloor(modeId) {
+  const mode = getMode(modeId);
+  const floor = mode?.autonomy_floor || {};
+  return {
+    auto: Array.isArray(floor.auto) ? floor.auto : [],
+    ask: Array.isArray(floor.ask) ? floor.ask : [],
+    never: Array.isArray(floor.never) ? floor.never : [],
+  };
 }
 
 /**

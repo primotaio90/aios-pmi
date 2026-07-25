@@ -52,6 +52,11 @@ export class Registry {
           mcp_whitelist: meta.mcp_whitelist || [],
           owns_files: meta.owns_files || [],
           keywords: meta.keywords || [],
+          // Autonomy (Fase A): flat lists of `tool[:glob]` entries. Empty = the
+          // default 'auto' everywhere, so a zero-config agent behaves as before.
+          auto_approve: meta.auto_approve || [],
+          ask_approve: meta.ask_approve || [],
+          never_approve: meta.never_approve || [],
           mock_summary: meta.mock_summary || '',
           system_prompt: body,
           file: `agents/${file}`,

@@ -19,7 +19,7 @@
  */
 import { getSettings, providerConfig, modelFor } from './settings.mjs';
 import { getLLMClient } from './llm/index.mjs';
-import { DEFAULT_MODE, getMode, effectiveTools, modeOverlay } from './modes.mjs';
+import { DEFAULT_MODE, getMode, effectiveTools, modeOverlay, autonomyFloor } from './modes.mjs';
 
 const MAX_HISTORY = 100;
 const REPLY_CONTEXT = 24; // recent turns fed back to the model
@@ -119,13 +119,13 @@ export class AgentChat {
       agent.system_prompt,
       ...(applyMode
         ? [
-            '',
-            // modeOverlay() intentionally omits the tool list: it is injected here,
-            // where the effective (already restricted) set is known.
-            modeOverlay(mode.id),
-            '',
-            `Strumenti disponibili in questa modalità: ${allow.join(', ') || 'nessuno'}.`,
-          ]
+          '',
+          // modeOverlay() intentionally omits the tool list: it is injected here,
+          // where the effective (already restricted) set is known.
+          modeOverlay(mode.id),
+          '',
+          `Strumenti disponibili in questa modalità: ${allow.join(', ') || 'nessuno'}.`,
+        ]
         : []),
       '',
       '---',
@@ -142,12 +142,17 @@ export class AgentChat {
     }));
     // The tool loop reads res.ok/res.error: a gateway denial throws, so it must
     // be converted into a soft result or the loop would abort mid-conversation.
+    // `context: 'interactive'` (Fase A): an `ask` waits indefinitely for the
+    // human instead of timing out like a background run. `modeFloor` is the
+    // autonomy floor of the active mode.
     const callTool = async (qualified, input) => {
       try {
         return await this.gateway.call(project, agent.id, qualified, input, {
           allow,
           mode: mode.id,
           reason: `non disponibile in modalità ${mode.label}`,
+          context: 'interactive',
+          modeFloor: autonomyFloor(mode.id),
         });
       } catch (err) {
         return { ok: false, error: String(err.message || err) };

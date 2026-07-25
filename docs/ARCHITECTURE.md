@@ -160,12 +160,13 @@ Eventi del bus (`{ts, project, type, agent, data}`), tutti persistiti in `logs/e
 | `agent.spawned` / `agent.teardown` | Lifecycle | `logs/lifecycle.jsonl` |
 | `agent.report` | report verticale esperto→direttore, direttore→orchestratore | — |
 | `mcp.call` | ogni chiamata al gateway MCP (anche negate) | `logs/mcp_calls.jsonl` |
+| `mcp.approval_required` / `mcp.approval_resolved` | coda approvazioni dell'autonomia (§12.5) | — |
 | `file.updated` | scrittura file di progetto | — |
 | `delivery.produced` | pacchetto di consegna generato dal DeliveryDesk (§12) | — |
 | `registry.updated` | hot-reload di `agents/` (project `*` = globale) | — |
 | `notify` | notifiche UI (level: info/warn/error) | — |
 
-Riga `mcp_calls.jsonl`: `{ts, agent, tool, payload, outcome: ok|denied|error, duration_ms, result_preview}`.
+Riga `mcp_calls.jsonl`: `{ts, agent, tool, payload, outcome: ok|denied|error, duration_ms, result_preview, policy: auto|approved|denied, approved_by: string|null}`. `policy`/`approved_by` (§12.5) tracciano cosa l'AI ha fatto da sola vs cosa un umano ha firmato; nelle righe storiche assenti equivalgono a `auto`/`null`.
 Riga `lifecycle.jsonl`: `{ts, event: spawn|teardown, agent, instance_id, by, task, token_budget, reason?, context_released?}`.
 
 ---
@@ -219,6 +220,8 @@ Tutte le altre rotte richiedono il cookie (401 altrimenti). Ruoli: `consultant` 
 | `/api/projects/:p/goals` | GET / POST | lista goal / `POST {text}` avvia orchestrazione (async, ritorna subito il goal) |
 | `/api/projects/:p/tasks` | GET | `?department=&status=` |
 | `/api/projects/:p/delivery` | GET / POST | `{snapshot}` deterministico / `POST {title?, include?, notes?}` → 201 `{delivery: {path, content}, snapshot}` (§12) |
+| `/api/projects/:p/approvals` | GET / POST | pendenti / `POST {id, approved}` → risolve la chiamata in attesa (§12.5) |
+| `/api/agents/:a/autonomy` | GET / POST | `{available, current, project}` / `POST {auto, ask, never, project?, session?}` (§12.5) |
 | `/api/projects/:p/directors/:d` | GET | drill-down: `{director, files[], subagents[], logs[]}` |
 | `/api/projects/:p/files` | GET | `?path=` → `{path, content}` (safe-join dentro il tenant) |
 | `/api/projects/:p/logs` | GET | `?type=events|mcp|lifecycle&agent=&limit=` |
@@ -256,7 +259,8 @@ ESM puro (node ≥ 18, nessuna dipendenza obbligatoria) così `scripts/demo.mjs`
 | `registry.mjs` | `class Registry(agentsDir, bus)` | `load()`, `watch()`, `all()`, `get(id)`, `orchestrator()`, `directors()`, `expertsOf(dirId)`, `errors` |
 | `tasks.mjs` | `class TaskManager(store, bus)`, `TASK_STATES`, `TRANSITIONS` | transizioni validate, history, eventi |
 | `gateway.mjs` | `class McpGateway(configPath, store, bus, registry, tasks)` | `call(project, agentId, tool, payload, opts)`, whitelist enforcement + restrizione di modalità (`opts.allow`), logging |
-| `modes.mjs` | `MODES`, `DEFAULT_MODE`, `getMode`, `listModes`, `effectiveTools`, `modeOverlay` | catalogo dichiarativo delle 5 modalità operative, senza dipendenze; restrizione **sottrattiva** della whitelist (§12) |
+| `modes.mjs` | `MODES`, `DEFAULT_MODE`, `getMode`, `listModes`, `effectiveTools`, `modeOverlay`, `autonomyFloor` | catalogo dichiarativo delle 5 modalità operative, senza dipendenze; restrizione **sottrattiva** della whitelist (§12) + floor di autonomia per modalità (§12.5) |
+| `autonomy.mjs` | `class AutonomyPolicy`, `class ApprovalQueue`, `matchGlob`, `resolvePolicy`, `normalizeLists` | terzo asse di permessi (§12.5): policy `auto\|ask\|never` con mini-glob interno `tool[:glob]`; coda approvazioni persistita |
 | `lifecycle.mjs` | `class Lifecycle(registry, bus)` | `spawn(project, agentId, byAgentId, taskId)`, `teardown(project, instanceId, reason)`, `active(project)`; enforcement gerarchico |
 | `runners/mock.mjs` | `createRunner(deps)` | playbook deterministici guidati dal frontmatter |
 | `runners/claude.mjs` | `createRunner(deps)` | Claude API reale (`@anthropic-ai/sdk`), tool-loop sul gateway |
@@ -503,3 +507,101 @@ genera una `pm.notification` «Pacchetto di consegna pronto» per i consulenti.
 
 Caveat serverless: come per §11, il dossier viene scritto in
 `projects/<tenant>/outputs/` e su FS read-only (Vercel) non persiste.
+
+### 12.5 Autonomia — `src/lib/aios/autonomy.mjs`
+
+Il terzo asse di permessi: fra i tool che un agente **possiede** (whitelist) e che
+sono **attivi** (modalità), quali può avviare **da solo**. Risponde alla domanda
+«cosa l'AI fa senza chiedere». Non altera i contratti §1-§10: senza configurazione
+il comportamento è identico a prima (default `auto` ovunque) e la pipeline dei goal
+resta non presidiata — non si blocca mai per default.
+
+**Tre assi, vince sempre il più restrittivo:**
+
+| asse | dove vive | cosa decide | enforcement |
+|---|---|---|---|
+| **Capacità** | `mcp_whitelist` (frontmatter) | quali tool l'agente possiede | gateway, 1º cancello |
+| **Modalità** | `modes.mjs` (§12.1) | quali di quelli sono attivi ora | gateway, 2º cancello (`opts.allow`) |
+| **Autonomia** | questo modulo | fra gli attivi, quali partono da soli | gateway, 3º cancello |
+
+Un tool può essere **capace** ma **non attivo** (fuori modalità) o **attivo** ma
+**non autonomo** (`ask`/`never`). La modalità non amplia mai la whitelist;
+l'autonomia non resuscita mai un tool già negato dai primi due cancelli.
+
+**Policy per tool: `auto | ask | never`** (default `auto`). Le liste sono **piatte**
+(frontmatter §2: solo scalari e liste `- voce`) e un tool può essere **scoped per
+path** con un suffisso glob, restando una stringa piatta:
+
+```yaml
+# agents/<id>.md
+auto_approve:
+  - filesystem.fs_read
+  - filesystem.fs_write:outputs/**    # scoped: auto solo se payload.path ∈ outputs/**
+ask_approve:
+  - filesystem.fs_write               # tutte le altre scritture chiedono
+  - tasks.task_update
+never_approve: []
+```
+
+Il mini-glob (`**` = qualsiasi sequenza incluse `/`, `*` = sequenza senza `/`) è
+interno a `autonomy.mjs`, senza dipendenze. Una voce con glob matcha solo quando
+`payload.path` cade nel glob; senza glob la voce vale per tutto il tool.
+
+**Sorgenti in risoluzione (ognuna può solo inasprire la precedente):**
+
+1. **floor della modalità** (`autonomyFloor(modeId)`, da `modes.mjs`): es. Architetto
+   pone `filesystem.fs_write: never`, Code lo pone `ask`, Orchestratore `{}`.
+2. **frontmatter dell'agente** (`auto_approve`/`ask_approve`/`never_approve`).
+3. **override per tenant** (`projects/<id>/state/autonomy.json`, stesso schema, ha
+   precedenza sul frontmatter).
+4. **override di sessione** («approva sempre per stavolta»): solo in memoria, mai su disco.
+
+Per ogni chiamata `resolvePolicy()` raccoglie il voto di ogni sorgente (la sua voce
+matching più restrittiva) e prende il **massimo** di restrittività
+(`auto`<`ask`<`never`). Una sorgente senza voce matching è neutra.
+
+**Enforcement nel gateway** (3º cancello, dopo whitelist e modalità, prima di
+`#dispatch`): `never` → log `denied` (`error: 'vietato dalla policy di autonomia'`) +
+`McpDeniedError`; `ask` → `await approvals.request(...)`; `auto` → prosegue. Il gate
+è **saltato del tutto** se `gateway.autonomy` non è cablato, così il comportamento
+senza il modulo è identico al precedente. Ogni riga `mcp.call` porta
+`policy: auto|approved|denied` e `approved_by: string|null`: l'audit trail distingue
+ciò che l'AI ha fatto da sola da ciò che un umano ha firmato.
+
+**Coda approvazioni** (`ApprovalQueue`): una richiesta `ask` non fallisce, **attende**.
+Emette `mcp.approval_required` sul bus (l'SSE trasporta già qualsiasi `type`,
+`bus.mjs` invariato), persiste in `state/approvals.json` e ritorna una Promise che
+`resolve(project, id, approved, byUser)` chiude (emettendo `mcp.approval_resolved`).
+Timeout: `120_000` ms in una run non presidiata, `null` (attesa indefinita) quando la
+chiamata arriva da `chat.mjs` — il contesto è passato esplicitamente
+(`opts.context: 'unattended' | 'interactive'`).
+
+**Fallback su run non presidiata** (niente di inventato): se un'approvazione scade
+dentro `engine.#runExpert`, la `McpDeniedError` porta il task in `blocked` — stato
+già legittimo (§3). `pm.mjs#onEvent` notifica già il consulente su `task.status →
+blocked`, la UI fa già il toast, e `blocked → assigned` è già una transizione valida
+per ripartire dopo l'approvazione.
+
+**Persistenza**: frontmatter (default agente), `state/autonomy.json` (override
+tenant), memoria (override sessione). Caveat serverless identico a §11: su FS
+read-only (Vercel) le regole e le consegne non persistono, e l'`await` bloccante di
+un'approvazione non sopravvive fra due lambda — in produzione il flusso «chiedi
+conferma» funziona in chat interattiva, nelle run lunghe degrada sul fallback
+`blocked` + notifica (vedi `docs/DEPLOY.md`).
+
+**API:**
+
+- `GET /api/agents/:a/autonomy` → `{available, current: {auto,ask,never}, project}`
+  (con `?project=` include l'override tenant effettivo).
+- `POST /api/agents/:a/autonomy` `{auto, ask, never, project?, session?}`: senza
+  `project` scrive il frontmatter (hot-reload); con `project` scrive l'override
+  tenant; con `session: true` solo in memoria.
+- `GET /api/projects/:p/approvals` → `{approvals}` pendenti (più recenti prima).
+- `POST /api/projects/:p/approvals` `{id, approved}` → risolve la chiamata in attesa
+  (404 se id sconosciuto o già deciso; la decisione è idempotente).
+
+**Editor** (`agentEdit.mjs#setAutonomy`): valida le tre liste (ogni voce `tool[:glob]`
+con tool esistente nel catalogo) e le scrive nel frontmatter, accanto a
+`setWhitelist()`. UI: tab «Autonomia» in `AgentChat.tsx` (controllo a 3 stati per
+tool, raggruppato per server, con profili rapidi), sezione matrice in
+`SettingsPanel.tsx`, badge pendenti in `Topbar.tsx` con toast Approva/Nega.

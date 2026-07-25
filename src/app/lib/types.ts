@@ -190,6 +190,8 @@ export type Toast = {
     id: string;
     level: 'info' | 'warn' | 'error' | 'success';
     message: string;
+    /** Approvazione associata (Fase A): se presente il toast mostra Approva/Nega. */
+    approval?: { id: string; agent: string; tool: string };
 };
 
 // --- LLM settings types -------------------------------------------------------
@@ -249,6 +251,35 @@ export type AgentNote = { ts: string; text: string };
 export type Capability = { qualified: string; server: string; tool: string; description: string };
 
 export type CapabilitiesResponse = { available: Capability[]; current: string[] };
+
+// --- Autonomia (Fase A) ------------------------------------------------------
+
+/** Policy di autonomia di un tool: parte da solo, chiede conferma, o vietato. */
+export type AutonomyPolicy = 'auto' | 'ask' | 'never';
+
+/** Le tre liste piatte `tool[:glob]` che compongono la policy di un agente. */
+export type AutonomyLists = { auto: string[]; ask: string[]; never: string[] };
+
+export type AutonomyResponse = {
+    available: Capability[];
+    /** Liste di default dell'agente (frontmatter). */
+    current: AutonomyLists;
+    /** Override per-tenant effettivo (state/autonomy.json), quando richiesto. */
+    project: AutonomyLists | null;
+};
+
+/** Richiesta di approvazione in coda per una chiamata `ask`. */
+export type Approval = {
+    id: string;
+    ts: string;
+    agent: string;
+    tool: string;
+    payload: Record<string, unknown>;
+    mode: string | null;
+    status: 'pending' | 'approved' | 'denied' | 'timeout';
+    decided_by: string | null;
+    decided_at: string | null;
+};
 
 // --- Project Manager (Fase 2) types -------------------------------------------
 

@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import type { AgentMeta, ProviderId, SettingsPatch, SettingsResponse, Toast } from '../lib/types';
 import { initials } from '../lib/text';
+import { AutonomyPanel } from './AutonomyPanel';
 
-type Tab = 'provider' | 'params' | 'agents';
+type Tab = 'provider' | 'params' | 'agents' | 'autonomy';
 
 const PROVIDER_LABEL: Record<ProviderId, string> = {
     mock: 'Mock (simulato, senza rete)',
@@ -43,6 +44,8 @@ export function SettingsPanel({
     const [maxTokens, setMaxTokens] = useState('8192');
     const [thinking, setThinking] = useState(true);
     const [overrides, setOverrides] = useState<Record<string, string>>({});
+    // Matrice autonomia: quale agente è espanso nella tab «Autonomia».
+    const [openAutonomy, setOpenAutonomy] = useState<string | null>(null);
 
     const hydrate = (d: SettingsResponse) => {
         setData(d);
@@ -154,6 +157,9 @@ export function SettingsPanel({
                 </button>
                 <button className={`view-tab ${tab === 'agents' ? 'active' : ''}`} onClick={() => setTab('agents')}>
                     Modello per agente
+                </button>
+                <button className={`view-tab ${tab === 'autonomy' ? 'active' : ''}`} onClick={() => setTab('autonomy')}>
+                    Autonomia
                 </button>
             </div>
 
@@ -351,6 +357,46 @@ export function SettingsPanel({
                                                 });
                                             }}
                                         />
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {tab === 'autonomy' && (
+                <div className="panel-grid panel-grid-1">
+                    <div className="glass panel-block">
+                        <div className="card-header">
+                            <h3 className="card-title">Matrice di autonomia dello studio</h3>
+                            <span className="badge">{agents.length} agenti</span>
+                        </div>
+                        <div className="card-body">
+                            <p className="settings-help" style={{ marginTop: 0 }}>
+                                Vista d’insieme: espandi un agente per decidere, fra i suoi tool concessi, quali
+                                avvia da solo, quali chiedono conferma e quali sono vietati. Le regole qui scritte
+                                sono il default dell’agente (frontmatter); l’override per progetto si gestisce
+                                dalla tab Autonomia della chat dell’agente.
+                            </p>
+                            <ul className="settings-agent-list">
+                                {agents.map((a) => (
+                                    <li key={a.id} className="settings-agent-row settings-agent-row-col">
+                                        <button
+                                            type="button"
+                                            className="settings-agent-name autonomy-expand"
+                                            onClick={() => setOpenAutonomy((cur) => (cur === a.id ? null : a.id))}
+                                        >
+                                            <span className="settings-agent-mono">{a.icon || initials(a.name)}</span>
+                                            {a.name}
+                                            <span className="settings-agent-level">{a.level}</span>
+                                            <span className="autonomy-expand-caret">{openAutonomy === a.id ? '▾' : '▸'}</span>
+                                        </button>
+                                        {openAutonomy === a.id && (
+                                            <div className="autonomy-expand-body">
+                                                <AutonomyPanel agentId={a.id} pushToast={pushToast} />
+                                            </div>
+                                        )}
                                     </li>
                                 ))}
                             </ul>

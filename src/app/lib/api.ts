@@ -4,6 +4,9 @@ import type {
     AgentChatMessage,
     AgentChatResponse,
     AgentNote,
+    Approval,
+    AutonomyLists,
+    AutonomyResponse,
     BusEvent,
     CapabilitiesResponse,
     DeliveryResult,
@@ -153,6 +156,47 @@ export const api = {
             body: JSON.stringify({ whitelist, project }),
         });
         return asJson(res) as Promise<CapabilitiesResponse>;
+    },
+
+    // --- Autonomia (Fase A) -----------------------------------------------------
+
+    /** Policy di autonomia di un agente (default frontmatter + override tenant se `project`). */
+    async agentAutonomy(agent: string, project?: string): Promise<AutonomyResponse> {
+        const qs = project ? `?project=${encodeURIComponent(project)}` : '';
+        const res = await fetch(`/api/agents/${encodeURIComponent(agent)}/autonomy${qs}`, { cache: 'no-store' });
+        return asJson(res) as Promise<AutonomyResponse>;
+    },
+
+    /** Scrive le liste di autonomia: frontmatter (default), override tenant (`project`) o sessione (`session`). */
+    async setAgentAutonomy(
+        agent: string,
+        lists: AutonomyLists,
+        opts: { project?: string; session?: boolean } = {}
+    ): Promise<AutonomyResponse> {
+        const res = await fetch(`/api/agents/${encodeURIComponent(agent)}/autonomy`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...lists, ...opts }),
+        });
+        return asJson(res) as Promise<AutonomyResponse>;
+    },
+
+    /** Approvazioni in coda per un tenant (le chiamate `ask` in attesa). */
+    async approvals(project: string): Promise<Approval[]> {
+        const res = await fetch(`/api/projects/${encodeURIComponent(project)}/approvals`, { cache: 'no-store' });
+        const body = await asJson(res);
+        return (body as { approvals: Approval[] }).approvals ?? [];
+    },
+
+    /** Risolve un'approvazione pendente: la chiamata in attesa prosegue o viene negata. */
+    async resolveApproval(project: string, id: string, approved: boolean): Promise<Approval> {
+        const res = await fetch(`/api/projects/${encodeURIComponent(project)}/approvals`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, approved }),
+        });
+        const body = await asJson(res);
+        return (body as { approval: Approval }).approval;
     },
 
     async projects(): Promise<ProjectMeta[]> {

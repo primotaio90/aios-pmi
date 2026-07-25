@@ -2039,6 +2039,7 @@ textarea {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--focus-ring);
 }
+
 /* --- Settings panel (LLM provider / params / per-agent model) --------------- */
 .topbar-gear {
   padding: 8px 12px;
@@ -2154,6 +2155,7 @@ textarea {
   flex-shrink: 0;
   transition: background 0.15s, border-color 0.15s;
 }
+
 .home-chat-btn:hover {
   background: var(--accent-soft);
   border-color: var(--accent);
@@ -2181,6 +2183,7 @@ textarea {
   align-self: flex-start;
   transition: opacity 0.15s;
 }
+
 .agent-chat-pin:hover {
   opacity: 1;
 }
@@ -2193,6 +2196,7 @@ textarea {
   flex-direction: column;
   gap: 10px;
 }
+
 .agent-note {
   display: flex;
   flex-direction: column;
@@ -2203,11 +2207,13 @@ textarea {
   border-left: 3px solid var(--accent);
   border-radius: var(--radius-sm);
 }
+
 .agent-note-ts {
   font-size: 11px;
   font-family: var(--font-mono);
   color: var(--text-muted);
 }
+
 .agent-note-text {
   font-size: 14px;
   color: var(--text);
@@ -2217,6 +2223,7 @@ textarea {
 .agent-tool-group {
   margin-top: 16px;
 }
+
 .agent-tool-server {
   font-size: 12px;
   font-weight: 700;
@@ -3171,3 +3178,196 @@ textarea {
   padding: 6px 0;
 }
 
+/* --- Autonomia (Fase A) ---------------------------------------------------- */
+
+/* Riepilogo in testata: "7 auto · 2 con conferma · 1 vietato". */
+.autonomy-summary {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-right: auto;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+/* Profili rapidi (Conservativo / Bilanciato / Autonomo). */
+.autonomy-profiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+
+.autonomy-profile {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.autonomy-profile:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Riga tool: etichetta a sinistra, controllo segmentato a destra. */
+.autonomy-item {
+  gap: 14px;
+}
+
+.autonomy-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Controllo segmentato a 3 stati (auto / conferma / vietato). */
+.autonomy-seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-muted);
+  flex-shrink: 0;
+}
+
+.autonomy-seg-btn {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.autonomy-seg-btn+.autonomy-seg-btn {
+  border-left: 1px solid var(--border);
+}
+
+.autonomy-seg-btn.seg-auto.on {
+  background: var(--success-soft, rgba(34, 197, 94, 0.16));
+  color: var(--success);
+}
+
+.autonomy-seg-btn.seg-ask.on {
+  background: var(--warning-soft, rgba(245, 158, 11, 0.16));
+  color: var(--warning);
+}
+
+.autonomy-seg-btn.seg-never.on {
+  background: var(--error-soft, rgba(239, 68, 68, 0.16));
+  color: var(--error);
+}
+
+/* Badge "🔔 N" approvazioni in topbar. */
+.approvals-badge {
+  color: var(--warning);
+  font-weight: 700;
+  border-color: var(--warning);
+  animation: approvals-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes approvals-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.35);
+  }
+
+  50% {
+    box-shadow: 0 0 0 6px rgba(245, 158, 11, 0);
+  }
+}
+
+/* Toast con azioni Approva/Nega inline. */
+.toast-approval {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: default;
+}
+
+.toast-approval-actions {
+  display: inline-flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.toast-action {
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.toast-action.toast-approve {
+  color: var(--success);
+}
+
+.toast-action.toast-approve:hover {
+  background: var(--success);
+  color: #fff;
+}
+
+.toast-action.toast-deny {
+  color: var(--error);
+}
+
+.toast-action.toast-deny:hover {
+  background: var(--error);
+  color: #fff;
+}
+
+/* Riga agente espandibile nella matrice di SettingsPanel. */
+.settings-agent-row-col {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+
+.autonomy-expand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+  font: inherit;
+}
+
+.autonomy-expand-caret {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.autonomy-expand-body {
+  margin-top: 12px;
+}
+
+/* Il pannello annidato nella matrice non ripete il bordo glass esterno. */
+.autonomy-expand-body>.glass.panel-block {
+  background: var(--surface);
+}
