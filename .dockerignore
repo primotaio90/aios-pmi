@@ -1,0 +1,30 @@
+# Dependencies & build output (rebuilt inside the image)
+node_modules
+.next
+
+# VCS & editor
+.git
+.gitignore
+.clerk
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
+
+# Mutable tenant data — lives ONLY on the deploy volume, never in the image
+# (would leak real client briefs/reports/logs). Seeded at runtime instead.
+projects
+
+# Local settings / secrets — never baked into the image
+*.local.json
+.env
+.env.*
+!.env.example
+
+# Docs & scripts not needed at runtime
+docs
+scripts
+
+# Local logs / scratch
+npm-debug.log*
+yarn-*.log*
+.pnpm-debug.log*
