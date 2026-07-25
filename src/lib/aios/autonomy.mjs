@@ -11,11 +11,18 @@
  *    (`never`). Default is `auto` everywhere → zero-config behaviour is
  *    byte-for-byte identical to before.
  *
- * Policy sources, in resolution order (each can only tighten the previous):
- *  1. mode autonomy floor      (declarative, per operating mode)
+ * Policy sources, in resolution order (later sources override earlier ones,
+ * EXCEPT the mode floor which is an unbreakable ceiling — see resolvePolicy):
+ *  1. mode autonomy floor      (declarative, per operating mode — NEVER loosened)
  *  2. agent frontmatter        (auto_approve / ask_approve / never_approve — flat lists)
- *  3. project override         (projects/<id>/state/autonomy.json, same schema, wins)
+ *  3. project override         (projects/<id>/state/autonomy.json, same schema)
  *  4. session override         (in-memory only, "approve for this session", never on disk)
+ *
+ * Semantics: within ONE source the most restrictive matching entry wins. ACROSS
+ * sources the LAST one with a matching entry wins (so a session "approve for
+ * this session" can loosen a frontmatter `ask` to `auto`). The mode floor is
+ * special: it is the guaranteed ceiling and can never be relaxed by anyone —
+ * that is what keeps the Architect from writing, no matter the overrides.
  *
  * Entries are FLAT strings so frontmatter.mjs keeps parsing them. A tool may be
  * path-scoped with a glob suffix: `filesystem.fs_write:outputs/**` matches only
@@ -48,16 +55,21 @@ const globCache = new Map();
 
 function compileGlob(pattern) {
     let re = '';
-    for (let i = 0; i < pattern.length; i += 1) {
+    const n = pattern.length;
+    for (let i = 0; i < n; i += 1) {
         const ch = pattern[i];
         if (ch === '*') {
             if (pattern[i + 1] === '*') {
-                re += '.*';
-                i += 1; // consume the second star
-                // A trailing `/**` also matches the bare directory (outputs/** ≡ outputs).
-                if (pattern[i + 1] === '/' && i + 1 === pattern.length - 1) {
-                    re += '?'; // make the final slash optional via the '.*?' trick below
+                // `**` at the very end (after a literal dir + '/'): the slash and
+                // everything after it are optional, so `outputs/**` also matches
+                // the bare directory `outputs` → `^outputs(/.*)?$`.
+                if (i + 1 === n - 1 && re.endsWith('/')) {
+                    re = re.slice(0, -1); // drop the literal trailing slash
+                    re += '(/.*)?';
+                } else {
+                    re += '.*';
                 }
+                i += 1; // consume the second star
             } else {
                 re += '[^/]*';
             }
@@ -113,25 +125,45 @@ function mostRestrictive(candidates) {
 }
 
 /**
- * Effective policy for ONE call, from a set of rule lists. Every list is
- * `{ auto:[], ask:[], never:[] }` of flat `tool[:glob]` entries. For the call
- * `tool`+`payload` we collect, per source, the policy that source assigns
- * (the source's own most-restrictive matching entry), then take the most
- * restrictive across all sources. A source with no matching entry is neutral.
+ * Effective policy for ONE call, from an ORDERED set of rule lists. Every list
+ * is `{ auto:[], ask:[], never:[] }` of flat `tool[:glob]` entries. Within one
+ * source, the most restrictive matching entry wins (`never` > `ask` > `auto`).
+ *
+ * The sources are [mode floor, frontmatter, project, session]. The DURABLE
+ * level is `mostRestrictive(floor, frontmatter, project)`: tenant and
+ * frontmatter can only tighten the agent, never loosen the mode floor. The
+ * SESSION is the single exception that may LOOSEN — it is the human saying
+ * "approve for this session" — but with two hard limits: it can only relax
+ * `ask` → `auto` (never remove a `never`), and it can never go below the mode
+ * floor. So the Architect (floor `fs_write: never`) still cannot write, no
+ * matter what the session says.
  */
 export function resolvePolicy(sources, tool, payload) {
-    const votes = [];
-    for (const src of sources) {
-        if (!src) continue;
+    const [floor, frontmatter, project, session] = sources;
+    const voteOf = (src) => {
+        if (!src) return null;
         const matched = [];
         for (const policy of POLICIES) {
             for (const entry of src[policy] || []) {
                 if (entryMatches(entry, tool, payload)) matched.push(policy);
             }
         }
-        if (matched.length > 0) votes.push(mostRestrictive(matched));
-    }
-    return mostRestrictive(votes); // empty → 'auto'
+        return matched.length > 0 ? mostRestrictive(matched) : null;
+    };
+
+    const floorVote = voteOf(floor);
+    // Durable level: mode floor + frontmatter + tenant, most restrictive wins.
+    const durable = mostRestrictive([floorVote, voteOf(frontmatter), voteOf(project)].filter(Boolean));
+
+    const sessionVote = voteOf(session);
+    if (sessionVote === null) return durable;
+    // The session may only LOOSEN: never add a restriction the durable level
+    // did not already have. And a durable `never` is absolute (cannot relax).
+    if (RANK[sessionVote] >= RANK[durable]) return durable;
+    if (durable === 'never') return durable;
+    // Relax ask → auto, but never below the mode floor.
+    if (floorVote !== null && RANK[floorVote] > RANK[sessionVote]) return floorVote;
+    return sessionVote;
 }
 
 /** Normalizes a raw {auto,ask,never} object into clean string arrays. */
@@ -173,7 +205,8 @@ export class AutonomyPolicy {
         return normalizeLists(all?.[agentId]);
     }
 
-    /** In-memory session override ("approve always, just this once"). */
+    /** In-memory session override ("approve for this session"): may tighten OR
+     *  loosen the frontmatter, but never the mode floor (resolvePolicy ceiling). */
     sessionLists(projectId, agentId) {
         return normalizeLists(this.session.get(`${projectId}/${agentId}`));
     }
@@ -238,6 +271,9 @@ export class ApprovalQueue {
         // In-flight resolvers: approvalId → { resolve, timer }.
         this.pending = new Map();
         this.chains = new Map(); // per-project write serialization
+        // Records marked stale after a restart: they still show in the panel
+        // (flagged) but no in-memory resolver is waiting on them anymore.
+        this.stale = new Set();
     }
 
     #chain(projectId, fn) {
@@ -255,10 +291,48 @@ export class ApprovalQueue {
         await this.store.writeState(projectId, APPROVALS_FILE, list);
     }
 
-    /** Pending (unresolved) approvals for a tenant, newest first. */
+    /**
+     * Marks every persisted 'pending' record as stale at boot. The in-memory
+     * resolvers die with the process, so after a restart a persisted 'pending'
+     * is an orphan nobody is waiting on: approving it settles the record (so it
+     * stops cluttering the queue) but unblocks nothing. We flag them so the UI
+     * can render them distinctly instead of pretending they are live.
+     */
+    async markOrphans(projectId) {
+        return this.#chain(projectId, async () => {
+            const list = await this.#read(projectId);
+            let changed = false;
+            for (const rec of list) {
+                if (rec.status === 'pending' && !this.pending.has(rec.id)) {
+                    rec.status = 'stale';
+                    rec.decided_by = null;
+                    rec.decided_at = rec.decided_at || new Date().toISOString();
+                    this.stale.add(rec.id);
+                    changed = true;
+                }
+            }
+            if (changed) await this.#write(projectId, list);
+            return changed;
+        });
+    }
+
+    /**
+     * Pending (unresolved, LIVE) approvals for a tenant, newest first. Routed
+     * through the per-project chain so it never reads a half-written state.
+     */
     async pendingList(projectId) {
-        const list = await this.#read(projectId);
-        return list.filter((a) => a.status === 'pending').reverse();
+        return this.#chain(projectId, async () => {
+            const list = await this.#read(projectId);
+            return list.filter((a) => a.status === 'pending').reverse();
+        });
+    }
+
+    /** All approvals incl. stale/resolved, newest first (for the panel history). */
+    async list(projectId, { limit = 50 } = {}) {
+        return this.#chain(projectId, async () => {
+            const list = await this.#read(projectId);
+            return list.slice(-limit).reverse();
+        });
     }
 
     /**
@@ -276,7 +350,7 @@ export class ApprovalQueue {
             tool,
             payload,
             mode,
-            status: 'pending', // pending | approved | denied | timeout
+            status: 'pending', // pending | approved | denied | timeout | stale
             decided_by: null,
             decided_at: null,
         };
@@ -315,6 +389,8 @@ export class ApprovalQueue {
     /**
      * Settles a pending request from the UI. Returns the updated record, or null
      * when the id is unknown / already decided (idempotent on the persisted state).
+     * If a live in-memory resolver exists it is released (the paused tool call
+     * proceeds or is denied); for a stale record only the persisted state moves.
      */
     async resolve(projectId, id, approved, byUser) {
         const status = approved ? 'approved' : 'denied';
@@ -324,6 +400,7 @@ export class ApprovalQueue {
         if (inflight) {
             if (inflight.timer) clearTimeout(inflight.timer);
             this.pending.delete(id);
+            this.stale.delete(id);
             inflight.resolve({ approved: Boolean(approved), by: byUser || 'consultant', reason: approved ? undefined : 'denied' });
         }
 
