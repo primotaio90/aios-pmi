@@ -352,8 +352,10 @@ Estensione della dashboard (non altera i contratti §1-§10):
   dell'agente scrivendo `mcp_whitelist` nel frontmatter (validato contro
   `mcp/servers.json`, hot-reload). API: `GET/POST /api/agents/:a/capabilities`.
 
-Caveat serverless (Vercel, FS read-only): settings/chat/note/whitelist non
-persistono in produzione — usare env per le chiavi (vedi `docs/DEPLOY.md`).
+Persistenza: settings/chat/note/whitelist vivono su filesystem (volume `/data`
+su Fly.io, radice del repo in locale). Su serverless (Vercel, FS read-only) non
+persisterebbero — motivo per cui il target di deploy è un host persistente
+(vedi `docs/DEPLOY.md` §1). Le chiavi possono anche arrivare da env.
 
 ## 12. Modalità operative e Consegna
 
@@ -505,8 +507,9 @@ genera una `pm.notification` «Pacchetto di consegna pronto» per i consulenti.
   pannello «📦 Consegna» raggiungibile dalla topbar e dalla scheda Orchestratore, ed
   è esclusivo rispetto agli altri pannelli (Impostazioni, PM, chat).
 
-Caveat serverless: come per §11, il dossier viene scritto in
-`projects/<tenant>/outputs/` e su FS read-only (Vercel) non persiste.
+Persistenza: come per §11, il dossier è scritto in `projects/<tenant>/outputs/`
+(volume persistente in produzione). Su FS read-only (serverless) non
+persisterebbe — vedi `docs/DEPLOY.md` §1.
 
 ### 12.5 Autonomia — `src/lib/aios/autonomy.mjs`
 
@@ -597,11 +600,12 @@ blocked`, la UI fa già il toast, e `blocked → assigned` è già una transizio
 per ripartire dopo l'approvazione.
 
 **Persistenza**: frontmatter (default agente), `state/autonomy.json` (override
-tenant), memoria (override sessione). Caveat serverless identico a §11: su FS
-read-only (Vercel) le regole e le consegne non persistono, e l'`await` bloccante di
-un'approvazione non sopravvive fra due lambda — in produzione il flusso «chiedi
-conferma» funziona in chat interattiva, nelle run lunghe degrada sul fallback
-`blocked` + notifica (vedi `docs/DEPLOY.md`).
+tenant), memoria (override sessione). Il flusso «chiedi conferma» richiede un
+processo persistente: l'`await` bloccante di un'approvazione vive in memoria
+(`ApprovalQueue`), quindi su serverless non sopravviverebbe fra due lambda —
+motivo strutturale del deploy su host persistente (vedi `docs/DEPLOY.md` §1).
+Su un host persistente il flusso funziona sia in chat interattiva sia, con
+fallback `blocked` + notifica, nelle run lunghe non presidiate.
 
 **API:**
 
