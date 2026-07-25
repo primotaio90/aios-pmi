@@ -130,6 +130,13 @@ async function build() {
   gateway.autonomy = autonomy;
   gateway.approvals = approvals;
 
+  // Boot cleanup: any 'pending' approval persisted by a previous process is an
+  // orphan (its in-memory resolver died with that process). Mark it stale so the
+  // panel shows it as no-longer-live instead of a button that does nothing.
+  for (const tenant of await store.listProjects().catch(() => [])) {
+    approvals.markOrphans(tenant.id).catch(() => { });
+  }
+
   // Persistence wiring: single writer for every audit log (no double logging).
   bus.subscribe((evt) => {
     if (!evt.project || evt.project === '*') return;

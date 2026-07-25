@@ -110,6 +110,15 @@ export class McpGateway {
         throw new McpDeniedError(agentId, tool);
       }
 
+      // `ask` needs the ApprovalQueue wired too: with a partial wiring (policy
+      // module but no queue) the call would crash on `this.approvals.request`.
+      // Deny explicitly instead, so a misconfiguration is a clean denial, not a
+      // TypeError that bypasses the audit contract.
+      if (policy === 'ask' && !this.approvals) {
+        await log('denied', { error: 'policy di autonomia "ask" senza coda approvazioni configurata', policy: 'denied' });
+        throw new McpDeniedError(agentId, tool);
+      }
+
       if (policy === 'ask') {
         // An unattended run waits up to the queue timeout, then falls back to
         // the engine's `blocked` state; an interactive chat waits indefinitely.
