@@ -16,6 +16,9 @@ export function Topbar({
     onOpenPM,
     onOpenSettings,
     onLogout,
+    sidebarOpen,
+    onToggleSidebar,
+    agentsCount,
 }: {
     user: SessionUser;
     projects: ProjectMeta[];
@@ -29,6 +32,9 @@ export function Topbar({
     onOpenPM: () => void;
     onOpenSettings: () => void;
     onLogout: () => void;
+    sidebarOpen?: boolean;
+    onToggleSidebar?: () => void;
+    agentsCount?: number;
 }) {
     const [creating, setCreating] = useState(false);
     const [name, setName] = useState('');
@@ -84,6 +90,17 @@ export function Topbar({
             </div>
 
             <div className="topbar-right">
+                {onToggleSidebar && (
+                    <button
+                        type="button"
+                        className={`btn btn-secondary ${sidebarOpen ? 'active' : ''}`}
+                        title="Mostra / Nascondi barra laterale agenti"
+                        onClick={onToggleSidebar}
+                    >
+                        🤖 Agenti {agentsCount ? `(${agentsCount})` : ''}
+                    </button>
+                )}
+
                 <span className={`sse-pill ${connected ? 'on' : 'off'}`} title="Stato SSE event bus">
                     <span className="pulse-dot"></span>
                     {connected ? 'live' : 'riconnessione…'}

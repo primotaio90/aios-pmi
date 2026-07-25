@@ -27,7 +27,7 @@ export type AgentUsage = {
 export type AgentMeta = {
     id: string;
     name: string;
-    level: 'orchestrator' | 'director' | 'expert';
+    level: 'orchestrator' | 'pm' | 'director' | 'expert';
     department: 'core' | 'business' | 'tech' | 'delivery';
     director: string | null;
     model: string;

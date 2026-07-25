@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, useEventStream } from './lib/api';
-import type { BusEvent, ModeId, OperatingMode, OverviewResponse, ProjectMeta, SessionUser, Toast } from './lib/types';
+import type { AgentMeta, BusEvent, ModeId, OperatingMode, OverviewResponse, ProjectMeta, SessionUser, Toast } from './lib/types';
 import { Login } from './components/Login';
 import { Topbar } from './components/Topbar';
 import { HomeGrid } from './components/HomeGrid';
@@ -12,6 +12,7 @@ import { PMConsole } from './components/PMConsole';
 import { SettingsPanel } from './components/SettingsPanel';
 import { AgentChat } from './components/AgentChat';
 import { DeliveryPanel } from './components/DeliveryPanel';
+import { AgentsSidebar } from './components/AgentsSidebar';
 import { ToastStack } from './components/Toast';
 import { initials } from './lib/text';
 
@@ -35,6 +36,8 @@ export default function Dashboard() {
   // undefined = whitelist unknown (still loading / fetch failed): ModeSelector
   // then marks nothing. An empty [] would wrongly mean "the agent has no tools".
   const [orchestratorTools, setOrchestratorTools] = useState<string[] | undefined>(undefined);
+  const [allAgents, setAllAgents] = useState<AgentMeta[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const current = projects.find((p) => p.id === projectId) ?? null;
   const { events, connected } = useEventStream(projectId);
@@ -57,14 +60,17 @@ export default function Dashboard() {
       .catch(() => setProjects([]));
   }, [user]);
 
-  // --- operating modes catalogue (once per session) -----------------------
+  // --- operating modes catalogue & agent registry (once per session) ------
   useEffect(() => {
     if (!user) return;
     api.modes()
       .then((ms) => setModes(ms))
       .catch(() => setModes([]));
     api.agents()
-      .then((reg) => setOrchestratorTools(reg.agents.find((a) => a.level === 'orchestrator')?.mcp_whitelist))
+      .then((reg) => {
+        setAllAgents(reg.agents || []);
+        setOrchestratorTools(reg.agents.find((a) => a.level === 'orchestrator')?.mcp_whitelist);
+      })
       .catch(() => setOrchestratorTools(undefined));
   }, [user]);
 
@@ -225,6 +231,9 @@ export default function Dashboard() {
         user={user}
         projects={projects}
         current={current}
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen((v) => !v)}
+        agentsCount={allAgents.length}
         onSelect={(id) => {
           setProjectId(id);
           setOpenDirector(null);
@@ -255,89 +264,107 @@ export default function Dashboard() {
         onLogout={handleLogout}
       />
 
-      <main className="dashboard-main">
-        {openSettings ? (
-          <SettingsPanel onBack={() => setOpenSettings(false)} pushToast={pushToast} />
-        ) : openDelivery && projectId ? (
-          <DeliveryPanel project={projectId} onBack={() => setOpenDelivery(false)} pushToast={pushToast} />
-        ) : chatAgent && projectId ? (
-          <AgentChat
-            project={projectId}
-            agentId={chatAgent}
-            onBack={() => setChatAgent(null)}
-            pushToast={pushToast}
-            modes={modes}
-          />
-        ) : (
-          <>
-        {!projectId && (
-          <div className="glass empty-state">
-            <h2>Benvenuto, {user.name.split(' ')[0]}</h2>
-            <p>Nessun progetto cliente presente. Crea il primo tenant dal pulsante + Nuovo in alto.</p>
-          </div>
-        )}
+      <div className="dashboard-body">
+        <AgentsSidebar
+          agents={allAgents}
+          overview={overview}
+          collapsed={!sidebarOpen}
+          onToggleCollapse={() => setSidebarOpen((v) => !v)}
+          onOpenDirector={(id) => {
+            setOpenDirector(id);
+            setOpenPM(false);
+            setOpenSettings(false);
+            setOpenDelivery(false);
+            setChatAgent(null);
+          }}
+          onChatAgent={openChat}
+          activeAgentId={chatAgent || openDirector}
+        />
 
-        {projectId && overviewError && (
-          <div className="glass panel-state login-error">{overviewError}</div>
-        )}
-
-        {projectId && !overview && !overviewError && (
-          <div className="glass panel-state">Caricamento progetto…</div>
-        )}
-
-        {projectId && overview && !openDirector && !openPM && (
-          <div className="home-wrap">
-            <GoalComposer
-              busy={orchestrating}
-              onSubmit={handleSubmitGoal}
+        <main className="dashboard-main">
+          {openSettings ? (
+            <SettingsPanel onBack={() => setOpenSettings(false)} pushToast={pushToast} />
+          ) : openDelivery && projectId ? (
+            <DeliveryPanel project={projectId} onBack={() => setOpenDelivery(false)} pushToast={pushToast} />
+          ) : chatAgent && projectId ? (
+            <AgentChat
+              project={projectId}
+              agentId={chatAgent}
+              onBack={() => setChatAgent(null)}
+              pushToast={pushToast}
               modes={modes}
-              mode={mode}
-              onModeChange={setMode}
-              orchestratorTools={orchestratorTools}
-              onAskMode={handleAskMode}
-              onOpenChat={orchestratorId ? () => openChat(orchestratorId) : undefined}
             />
-            <HomeGrid
-              project={overview.project}
-              orchestrator={overview.orchestrator}
-              directors={overview.directors}
+          ) : (
+            <>
+          {!projectId && (
+            <div className="glass empty-state">
+              <h2>Benvenuto, {user.name.split(' ')[0]}</h2>
+              <p>Nessun progetto cliente presente. Crea il primo tenant dal pulsante + Nuovo in alto.</p>
+            </div>
+          )}
+
+          {projectId && overviewError && (
+            <div className="glass panel-state login-error">{overviewError}</div>
+          )}
+
+          {projectId && !overview && !overviewError && (
+            <div className="glass panel-state">Caricamento progetto…</div>
+          )}
+
+          {projectId && overview && !openDirector && !openPM && (
+            <div className="home-wrap">
+              <GoalComposer
+                busy={orchestrating}
+                onSubmit={handleSubmitGoal}
+                modes={modes}
+                mode={mode}
+                onModeChange={setMode}
+                orchestratorTools={orchestratorTools}
+                onAskMode={handleAskMode}
+                onOpenChat={orchestratorId ? () => openChat(orchestratorId) : undefined}
+              />
+              <HomeGrid
+                project={overview.project}
+                orchestrator={overview.orchestrator}
+                directors={overview.directors}
+                onOpenDirector={(id) => setOpenDirector(id)}
+                onChatAgent={openChat}
+              />
+            </div>
+          )}
+
+          {projectId && openDirector && isOrchestrator && overview?.orchestrator && (
+            <OrchestratorPanel
+              overview={overview}
+              events={events}
+              onBack={() => setOpenDirector(null)}
               onOpenDirector={(id) => setOpenDirector(id)}
               onChatAgent={openChat}
+              onOpenDelivery={openDeliveryPanel}
             />
-          </div>
-        )}
+          )}
 
-        {projectId && openDirector && isOrchestrator && overview?.orchestrator && (
-          <OrchestratorPanel
-            overview={overview}
-            events={events}
-            onBack={() => setOpenDirector(null)}
-            onOpenDirector={(id) => setOpenDirector(id)}
-            onChatAgent={openChat}
-            onOpenDelivery={openDeliveryPanel}
-          />
-        )}
+          {projectId && openDirector && isDirector && (
+            <DirectorPanel
+              project={projectId}
+              directorId={openDirector}
+              events={events}
+              onBack={() => setOpenDirector(null)}
+              onChatAgent={openChat}
+            />
+          )}
 
-        {projectId && openDirector && isDirector && (
-          <DirectorPanel
-            project={projectId}
-            directorId={openDirector}
-            events={events}
-            onBack={() => setOpenDirector(null)}
-            onChatAgent={openChat}
-          />
-        )}
+          {projectId && openPM && (
+            <PMConsole project={projectId} events={events} onBack={() => setOpenPM(false)} />
+          )}
 
-        {projectId && openPM && (
-          <PMConsole project={projectId} events={events} onBack={() => setOpenPM(false)} />
-        )}
-
-        {projectId && openDirector && !isOrchestrator && !isDirector && (
-          <div className="glass panel-state login-error">Agente non valido come drill-down.</div>
-        )}
-          </>
-        )}
-      </main>
+          {projectId && openDirector && !isOrchestrator && !isDirector && (
+            <div className="glass panel-state login-error">Agente non valido come drill-down.</div>
+          )}
+            </>
+          )}
+        </main>
+      </div>
 
       <ToastStack toasts={toasts} onDismiss={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
     </div>
