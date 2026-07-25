@@ -36,6 +36,11 @@ yarn-error.log*
 # LLM settings edited from the dashboard (may contain API keys)
 /config/llm_settings.local.json
 
+# Tenant data — mutable client work, lives ONLY on the deploy volume, never in
+# git (would leak real briefs/reports/logs). Keep only the structure marker.
+/projects/*
+!/projects/.gitkeep
+
 # vercel
 .vercel
 

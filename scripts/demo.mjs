@@ -40,6 +40,25 @@ console.log('══════════════════════�
 console.log(`Runner: ${sys.runnerMode} · Agenti nel registry: ${sys.registry.all().length} (errori: ${sys.registry.errors.length})`);
 console.log(`Progetto: ${project}`);
 console.log(`Obiettivo: ${goalText}`);
+
+// projects/ is gitignored (mutable tenant data), so a fresh clone has no demo
+// tenant. Scaffold it on the fly so the demo is reproducible from code alone.
+const tenantExists = await sys.store
+  .readProject(project)
+  .then(() => true)
+  .catch(() => false);
+if (!tenantExists) {
+  console.log(`→ Tenant "${project}" assente: lo creo con store.createProject()...`);
+  await sys.store.createProject({
+    id: project,
+    name: project
+      .split('-')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' '),
+    client: 'Demo',
+    description: 'Tenant demo auto-generato da scripts/demo.mjs',
+  });
+}
 console.log('');
 
 const t0 = Date.now();
