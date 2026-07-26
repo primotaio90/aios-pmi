@@ -46,12 +46,16 @@ primary_region = "fra"      # pick the region closest to your consultants
   auto_start_machines = true
   min_machines_running = 1
 
+  # Health check on "/" — the app is a SPA: src/app/ has only page.tsx, and
+  # /api/login exposes POST/DELETE only, so a GET /login would 404 and the
+  # machine would be marked unhealthy. "/" serves the shell (login included)
+  # and answers 200 without a session.
   [[http_service.checks]]
     interval = "30s"
     timeout = "5s"
     grace_period = "10s"
     method = "GET"
-    path = "/login"
+    path = "/"
 
 # Rollout that replaces the single machine (no two live at once on the volume).
 [deploy]
