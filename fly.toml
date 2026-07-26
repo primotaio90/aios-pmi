@@ -21,8 +21,8 @@
 # Do NOT raise the machine count to "scale": it will silently break approvals,
 # SSE and runs. Read this before editing, six months from now.
 
-app = "aios"                # change to your Fly app name
-primary_region = "fra"      # pick the region closest to your consultants
+app = "aios-pmi"            # must match the app created on Fly (`fly apps list`)
+primary_region = "fra"      # MUST match the region of the aios_data volume
 
 [build]
   dockerfile = "Dockerfile"
