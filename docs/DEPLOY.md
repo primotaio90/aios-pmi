@@ -57,6 +57,18 @@ Proprio perché lo stato è in memoria di processo, la configurazione Fly è vin
 Chi modificherà `fly.toml` deve capire che **scalare non è un'opzione** senza prima
 migrare lo stato a un backend esterno (decisione futura, fuori scope qui).
 
+> ⚠️ **`fly volumes create` ti consiglierà di sbagliare.** Stampa questo avviso:
+> *«Every volume is pinned to a specific physical host. You should create two or
+> more volumes per application to avoid downtime.»* È un buon consiglio per
+> un'app stateless replicabile, ed è **il consiglio sbagliato per AIOS**: un
+> secondo volume è esattamente ciò che consente a una seconda macchina di
+> esistere, e due macchine rompono coda approvazioni, SSE e run del motore —
+> senza un errore da mostrare, il che è la parte peggiore. **Un volume solo, ed è
+> quello il presidio.** Il rischio di guasto dell'host è accettato consapevolmente
+> e coperto dagli snapshot automatici (§7), non da una seconda copia viva.
+> Verifica di avere una macchina sola con `fly status`: la colonna deve
+> contenere una riga, non due.
+
 ---
 
 ## 3. Dove vivono i dati (confine git / immagine / volume)

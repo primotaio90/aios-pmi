@@ -40,6 +40,13 @@ primary_region = "ams"      # MUST match the region of the aios_data volume
 # Persistent volume holding every mutable byte of every client. One machine,
 # one volume: a second machine on the same volume would corrupt the single-
 # writer audit logs, so the volume is attached to the single machine only.
+#
+# `fly volumes create` prints a warning advising two or more volumes per app to
+# avoid downtime. DO NOT follow it here. A second volume is exactly what lets a
+# second machine exist, and that breaks the in-memory state described at the top
+# of this file — silently, with no error to point at. The single volume IS the
+# safeguard. Host-failure risk is accepted and covered by scheduled snapshots
+# (fly volumes snapshots list aios_data); restore is documented in DEPLOY.md §7.
 [[mounts]]
   source = "aios_data"
   destination = "/data"
