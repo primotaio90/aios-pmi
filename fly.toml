@@ -10,7 +10,14 @@
 #     events; a stopped machine kills every open stream.
 #   - Engine runs (src/lib/aios/engine.mjs): multi-step orchestrations longer than
 #     a single request, held in memory.
-# So: max_machines_running = 1, min_machines_running = 1, auto_stop_machines off.
+# How that "exactly one" is actually enforced — fly.toml has NO
+# `max_machines_running` key (it does not exist in Fly's schema; writing one
+# would be silently ignored and give false assurance). The real guarantees are:
+#   1. `fly scale count 1` — the machine count lives in Fly state, not here.
+#      Check it with `fly scale show`; it is the ONLY knob that caps replicas.
+#   2. The volume below: a Fly volume attaches to one machine at a time, so a
+#      second machine simply cannot get `aios_data`.
+#   3. `auto_stop_machines = false` here, so the one machine is never stopped.
 # Do NOT raise the machine count to "scale": it will silently break approvals,
 # SSE and runs. Read this before editing, six months from now.
 
