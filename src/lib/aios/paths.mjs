@@ -19,9 +19,9 @@ import { fileURLToPath } from 'node:url';
 const FALLBACK = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 export function resolveRoot() {
-    const fromEnv = process.env.AIOS_ROOT;
-    if (typeof fromEnv === 'string' && fromEnv.trim()) {
-        return path.resolve(fromEnv.trim());
-    }
-    return FALLBACK;
+  const fromEnv = process.env.AIOS_ROOT;
+  if (typeof fromEnv === 'string' && fromEnv.trim()) {
+    return path.resolve(fromEnv.trim());
+  }
+  return FALLBACK;
 }
