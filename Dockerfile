@@ -4,11 +4,16 @@
 # AIOS — all-in-one image (Next.js standalone + seed of the mutable state).
 #
 #   build  → compiles .next/standalone (self-contained Node server)
-#   runtime→ non-root user, /app/seed pristine copy, volume mounted at /data
+#   runtime→ /app/seed pristine copy, volume mounted at /data, server non-root
 #
 # The container expects a persistent volume at AIOS_ROOT (default /data):
 # projects/, agents/, config/users.json, mcp/ and llm_settings.local.json all
 # live there. The entrypoint seeds ONLY missing files on first boot.
+#
+# Privilege model: the image has NO `USER` instruction, so the entrypoint runs
+# as root just long enough to adopt the freshly mounted volume (which arrives
+# root:root — see scripts/docker-entrypoint.sh), then drops to `aios` with
+# su-exec before exec'ing the server. The Node process never runs as root.
 # ---------------------------------------------------------------------------
 
 FROM node:20-alpine AS build
@@ -33,8 +38,10 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \
     AIOS_ROOT=/data
 
-# Non-root user. The /data volume and /app/seed must be writable by it.
-RUN addgroup -S aios && adduser -S aios -G aios
+# Unprivileged user the server runs as, plus su-exec for the privilege drop
+# performed by the entrypoint (see the header note).
+RUN addgroup -S aios && adduser -S aios -G aios \
+  && apk add --no-cache su-exec
 
 # Standalone server + static assets (the only runtime artefacts needed).
 # NOTE: no `COPY public/` — this project has no static asset directory. Do not
@@ -52,9 +59,11 @@ COPY --from=build /app/config/users.json ./seed/config/users.json
 COPY scripts/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh \
   && mkdir -p /data \
-  && chown -R aios:aios /data /app
+  && chown -R aios:aios /app
 
-USER aios
+# No `USER aios` here on purpose: a mounted volume replaces the image's /data
+# and arrives owned by root, so chowning it at build time would be pointless.
+# The entrypoint chowns the mount at runtime and then drops privileges itself.
 EXPOSE 3000
 
 # The volume mount point (declared for documentation; fly.toml mounts it).
