@@ -37,9 +37,10 @@ ENV NODE_ENV=production \
 RUN addgroup -S aios && adduser -S aios -G aios
 
 # Standalone server + static assets (the only runtime artefacts needed).
+# NOTE: no `COPY public/` — this project has no static asset directory. Do not
+# re-add the line from the stock Next.js Dockerfile: it fails the build.
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
-COPY --from=build /app/public ./public
 
 # Pristine seed of the mutable state, copied to the volume on first boot.
 COPY --from=build /app/agents ./seed/agents
@@ -47,6 +48,7 @@ COPY --from=build /app/mcp ./seed/mcp
 COPY --from=build /app/config/users.json ./seed/config/users.json
 
 # Entrypoint that seeds missing files onto the volume, then runs the server.
+# (.dockerignore excludes scripts/ but re-includes this one file explicitly.)
 COPY scripts/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh \
   && mkdir -p /data \

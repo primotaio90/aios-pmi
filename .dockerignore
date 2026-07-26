@@ -23,6 +23,10 @@ projects
 # Docs & scripts not needed at runtime
 docs
 scripts
+# …except the entrypoint, which the Dockerfile COPYies into the runtime stage.
+# Docker honours a `!` exception even when the parent directory is excluded
+# (unlike .gitignore). Without this line the COPY fails: file not in context.
+!scripts/docker-entrypoint.sh
 
 # Local logs / scratch
 npm-debug.log*
