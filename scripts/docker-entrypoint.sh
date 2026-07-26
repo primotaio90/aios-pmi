@@ -31,21 +31,42 @@ echo "[entrypoint] AIOS_ROOT=$AIOS_ROOT — seeding file mancanti da $SEED"
 
 mkdir -p "$AIOS_ROOT/agents" "$AIOS_ROOT/config" "$AIOS_ROOT/mcp" "$AIOS_ROOT/projects"
 
-# Copy missing files only (cp -n: no clobber). One pass per seeded tree.
-copy_missing() {
+# Copy every seed file that has no counterpart on the volume, leaving existing
+# ones strictly untouched. Walks file by file, so it is no-clobber by
+# construction and reports exactly what it wrote.
+#
+# Do NOT "simplify" this back to `cp -Rn "$src/." "$dst/"`. That form works
+# under GNU/BSD cp but is a SILENT NO-OP under the BusyBox cp in Alpine: it
+# copies nothing and still exits 0, so the volume stays empty, every route
+# 500s on a missing mcp/servers.json, and no error is ever logged. That bug
+# is invisible unless the seeding is tested inside the actual image.
+seed_missing() {
   src_dir="$1"
   dst_dir="$2"
   [ -d "$src_dir" ] || return 0
-  # -n = do not overwrite an existing file; -R keeps the tree flat per dir.
-  cp -Rn "$src_dir/." "$dst_dir/" 2>/dev/null || true
+  find "$src_dir" -type f | while read -r src; do
+    rel="${src#"$src_dir"/}"
+    dst="$dst_dir/$rel"
+    if [ -e "$dst" ]; then
+      continue
+    fi
+    mkdir -p "$(dirname "$dst")"
+    cp "$src" "$dst"
+    echo "[entrypoint] seedato ${dst#"$AIOS_ROOT"/}"
+  done
 }
 
-copy_missing "$SEED/agents" "$AIOS_ROOT/agents"
-copy_missing "$SEED/mcp" "$AIOS_ROOT/mcp"
+# config/ seeds users.json only: llm_settings.local.json is deliberately absent
+# from the image (it holds API keys) and is created by the Settings panel.
+seed_missing "$SEED/agents" "$AIOS_ROOT/agents"
+seed_missing "$SEED/mcp" "$AIOS_ROOT/mcp"
+seed_missing "$SEED/config" "$AIOS_ROOT/config"
 
-if [ ! -f "$AIOS_ROOT/config/users.json" ] && [ -f "$SEED/config/users.json" ]; then
-  cp "$SEED/config/users.json" "$AIOS_ROOT/config/users.json"
-  echo "[entrypoint] seedato config/users.json"
+# Fail loudly rather than booting a server that will 500 on every request: the
+# gateway opens this file at startup and there is no sane fallback without it.
+if [ ! -f "$AIOS_ROOT/mcp/servers.json" ]; then
+  echo "[entrypoint] ERRORE: $AIOS_ROOT/mcp/servers.json assente dopo il seeding" >&2
+  exit 1
 fi
 
 # If we are not root (e.g. someone ran the image with `--user`), there is
