@@ -118,4 +118,53 @@ export class AgentEditor {
     });
     return this.capabilities(agentId);
   }
+
+  /**
+   * Autonomy view for one agent: its frontmatter autonomy lists plus the full
+   * tool catalog (so the UI renders one row per available tool). Empty lists =
+   * the default 'auto' everywhere.
+   */
+  autonomy(agentId) {
+    const agent = this.registry.get(agentId);
+    if (!agent) throw new Error(`Agente sconosciuto: ${agentId}`);
+    const { available } = this.capabilities(agentId);
+    return {
+      available,
+      current: {
+        auto: agent.auto_approve || [],
+        ask: agent.ask_approve || [],
+        never: agent.never_approve || [],
+      },
+    };
+  }
+
+  /**
+   * Writes the agent's autonomy lists (auto_approve / ask_approve /
+   * never_approve) into its frontmatter. Entries are flat `tool[:glob]`
+   * strings; the tool part must exist in the catalog. A tool not listed in any
+   * of the three lists keeps the default 'auto'. Frontmatter stays flat (§2).
+   */
+  async setAutonomy(agentId, lists, { by = 'consultant', project = null } = {}) {
+    if (!lists || typeof lists !== 'object') throw new Error('Liste di autonomia mancanti');
+    const clean = {};
+    for (const key of ['auto', 'ask', 'never']) {
+      const list = Array.isArray(lists[key]) ? lists[key] : [];
+      const unique = [...new Set(list.map((e) => String(e).trim()).filter(Boolean))];
+      for (const entry of unique) {
+        const tool = String(entry).split(':')[0];
+        if (!this.gateway.toolExists(tool)) throw new Error(`Tool MCP inesistente: ${tool}`);
+      }
+      clean[key] = unique;
+    }
+    const { file, meta, body } = await this.#read(agentId);
+    meta.auto_approve = clean.auto;
+    meta.ask_approve = clean.ask;
+    meta.never_approve = clean.never;
+    await this.#writeAndReload(file, meta, body, project, 'agent.autonomy', {
+      agent: agentId,
+      by,
+      counts: { auto: clean.auto.length, ask: clean.ask.length, never: clean.never.length },
+    });
+    return this.autonomy(agentId);
+  }
 }

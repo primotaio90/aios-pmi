@@ -2,8 +2,9 @@
 //
 // Position: [consultants] <-> PM <-> [Orchestrator_Core -> Directors -> Experts].
 // The PM is a CLIENT of the bus and the Engine: it subscribes to goal.* / task.*
-// to build project state, and emits its own pm.* topics (already carried by the
-// SSE channel without changes to bus.mjs). It never talks to Directors or experts.
+// and to delivery.produced (the DeliveryDesk dossier) to build project state, and
+// emits its own pm.* topics (already carried by the SSE channel without changes to
+// bus.mjs). It never talks to Directors or experts.
 //
 // Responsibilities (docs/FASE2_PM.md + user requirements):
 //  - overview(): KPIs + interactive checklist (files produced/to-produce, tasks,
@@ -18,8 +19,9 @@
 //    (kept separate from tasks.json to never alter the engine state machine).
 //  - suggestNext(): proposes next actions from blocked/review tasks.
 //
-// Auto-subscriber: on task.status -> review/blocked and goal.completed it emits a
-// pm.notification addressed to the consultant who should review or proceed.
+// Auto-subscriber: on task.status -> review/blocked, on goal.completed and on
+// delivery.produced it emits a pm.notification addressed to the consultant who
+// should review, proceed or hand the delivery package over to the client.
 export class ProjectManager {
     constructor({ registry, store, bus, tasks, engine }) {
         this.registry = registry;
@@ -47,7 +49,7 @@ export class ProjectManager {
 
     async #onEvent(evt) {
         if (!evt.project || evt.project === '*') return;
-        if (evt.type !== 'task.status' && evt.type !== 'goal.completed') return;
+        if (evt.type !== 'task.status' && evt.type !== 'goal.completed' && evt.type !== 'delivery.produced') return;
 
         if (evt.type === 'task.status') {
             const data = evt.data || {};
@@ -80,6 +82,18 @@ export class ProjectManager {
                 subject: `Goal ${data.goal_id} completato`,
                 body: `Il goal ${data.goal_id} è stato completato. Il report finale è disponibile in ${data.report_path || 'outputs/'}.`,
                 goal_id: data.goal_id,
+                level: 'success',
+            });
+        }
+
+        if (evt.type === 'delivery.produced') {
+            // The DeliveryDesk wrote a client-facing dossier: tell the consultant
+            // it is ready to be shared, with the readiness numbers of the snapshot.
+            const data = evt.data || {};
+            await this.notifyConsultant(evt.project, {
+                to: 'consultants',
+                subject: `Pacchetto di consegna pronto`,
+                body: `È stato generato il pacchetto di consegna ${data.path} (${data.ready} documenti pronti, ${data.partial} in lavorazione, ${data.missing} non disponibili). Puoi condividerlo con il cliente.`,
                 level: 'success',
             });
         }

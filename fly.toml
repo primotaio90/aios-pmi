@@ -1,0 +1,77 @@
+# AIOS on Fly.io — single, always-on machine with a persistent volume.
+#
+# NON-NEGOTIABLE ARCHITECTURE CONSTRAINT: exactly ONE machine, never autoscaled,
+# never auto-stopped. Three pieces of state live in process memory:
+#   - ApprovalQueue (src/lib/aios/autonomy.mjs): an interactive `ask` call holds an
+#     open HTTP request (timeoutMs = null) waiting for a human decision. A second
+#     machine or a stop would orphan those pending resolvers.
+#   - The SSE stream (src/app/api/events/route.ts): an in-process ReadableStream
+#     bound to the in-memory Bus. Multiple replicas would each see only their own
+#     events; a stopped machine kills every open stream.
+#   - Engine runs (src/lib/aios/engine.mjs): multi-step orchestrations longer than
+#     a single request, held in memory.
+# How that "exactly one" is actually enforced — fly.toml has NO
+# `max_machines_running` key (it does not exist in Fly's schema; writing one
+# would be silently ignored and give false assurance). The real guarantees are:
+#   1. `fly scale count 1` — the machine count lives in Fly state, not here.
+#      Check it with `fly scale show`; it is the ONLY knob that caps replicas.
+#   2. The volume below: a Fly volume attaches to one machine at a time, so a
+#      second machine simply cannot get `aios_data`.
+#   3. `auto_stop_machines = false` here, so the one machine is never stopped.
+# Do NOT raise the machine count to "scale": it will silently break approvals,
+# SSE and runs. Read this before editing, six months from now.
+
+app = "aios-pmi"            # must match the app created on Fly (`fly apps list`)
+primary_region = "ams"      # MUST match the region of the aios_data volume
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3000"
+  # AIOS_ROOT points the engine at the mounted volume (see paths.mjs). All
+  # mutable state — projects/, agents/, config/, mcp/, llm_settings — lives
+  # there, NOT in the image. This is the only reason a redeploy loses nothing.
+  AIOS_ROOT = "/data"
+  # AIOS_RUNNER / ANTHROPIC_API_KEY / OPENAI_API_KEY are set as Fly secrets
+  # (fly secrets set …), never here, so they never enter the repo.
+
+# Persistent volume holding every mutable byte of every client. One machine,
+# one volume: a second machine on the same volume would corrupt the single-
+# writer audit logs, so the volume is attached to the single machine only.
+#
+# `fly volumes create` prints a warning advising two or more volumes per app to
+# avoid downtime. DO NOT follow it here. A second volume is exactly what lets a
+# second machine exist, and that breaks the in-memory state described at the top
+# of this file — silently, with no error to point at. The single volume IS the
+# safeguard. Host-failure risk is accepted and covered by scheduled snapshots
+# (fly volumes snapshots list aios_data); restore is documented in DEPLOY.md §7.
+[[mounts]]
+  source = "aios_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  # Keep ONE machine running at all times. A stop for inactivity would kill
+  # pending approvals and open SSE streams — this is why autoscaling is off.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  # Health check on "/" — the app is a SPA: src/app/ has only page.tsx, and
+  # /api/login exposes POST/DELETE only, so a GET /login would 404 and the
+  # machine would be marked unhealthy. "/" serves the shell (login included)
+  # and answers 200 without a session.
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/"
+
+# Rollout that replaces the single machine (no two live at once on the volume).
+[deploy]
+  strategy = "rolling"
+  max_unavailable = 1

@@ -10,10 +10,17 @@ export function Topbar({
     onSelect,
     onCreate,
     connected,
+    deliveryEnabled,
+    onOpenDelivery,
     pmEnabled,
     onOpenPM,
     onOpenSettings,
     onLogout,
+    sidebarOpen,
+    onToggleSidebar,
+    agentsCount,
+    pendingApprovals = 0,
+    onOpenApprovals,
 }: {
     user: SessionUser;
     projects: ProjectMeta[];
@@ -21,10 +28,18 @@ export function Topbar({
     onSelect: (id: string) => void;
     onCreate: (input: { name: string; client?: string; description?: string }) => Promise<void>;
     connected: boolean;
+    deliveryEnabled: boolean;
+    onOpenDelivery: () => void;
     pmEnabled: boolean;
     onOpenPM: () => void;
     onOpenSettings: () => void;
     onLogout: () => void;
+    sidebarOpen?: boolean;
+    onToggleSidebar?: () => void;
+    agentsCount?: number;
+    /** Richieste di approvazione in coda (Fase A): il badge compare solo se > 0. */
+    pendingApprovals?: number;
+    onOpenApprovals?: () => void;
 }) {
     const [creating, setCreating] = useState(false);
     const [name, setName] = useState('');
@@ -80,10 +95,42 @@ export function Topbar({
             </div>
 
             <div className="topbar-right">
+                {onToggleSidebar && (
+                    <button
+                        type="button"
+                        className={`btn btn-secondary ${sidebarOpen ? 'active' : ''}`}
+                        title="Mostra / Nascondi barra laterale agenti"
+                        onClick={onToggleSidebar}
+                    >
+                        🤖 Agenti {agentsCount ? `(${agentsCount})` : ''}
+                    </button>
+                )}
+
                 <span className={`sse-pill ${connected ? 'on' : 'off'}`} title="Stato SSE event bus">
                     <span className="pulse-dot"></span>
                     {connected ? 'live' : 'riconnessione…'}
                 </span>
+
+                {pendingApprovals > 0 && (
+                    <button
+                        type="button"
+                        className="btn btn-secondary approvals-badge"
+                        title="Approvazioni in attesa: un agente chiede conferma prima di agire"
+                        onClick={onOpenApprovals}
+                    >
+                        🔔 {pendingApprovals}
+                    </button>
+                )}
+
+                <button
+                    type="button"
+                    className="btn btn-primary topbar-delivery"
+                    title="Cosa possiamo già consegnare al cliente"
+                    onClick={onOpenDelivery}
+                    disabled={!deliveryEnabled}
+                >
+                    📦 Consegna
+                </button>
 
                 <button
                     type="button"

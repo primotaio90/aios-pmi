@@ -4,12 +4,19 @@ import type {
     AgentChatMessage,
     AgentChatResponse,
     AgentNote,
+    Approval,
+    AutonomyLists,
+    AutonomyResponse,
     BusEvent,
     CapabilitiesResponse,
+    DeliveryResult,
+    DeliverySnapshot,
     DirectorDrilldown,
     FileContent,
     Goal,
     LogsResponse,
+    ModeId,
+    OperatingMode,
     OverviewResponse,
     PMChatResponse,
     PMChecklistToggle,
@@ -71,6 +78,15 @@ export const api = {
         return asJson(res) as Promise<RegistryResponse>;
     },
 
+    // --- Modalità operative ---------------------------------------------------
+
+    /** Catalogo statico delle modalità (senza gli overlay di system prompt). */
+    async modes(): Promise<OperatingMode[]> {
+        const res = await fetch('/api/modes', { cache: 'no-store' });
+        const body = await asJson(res);
+        return (body as { modes: OperatingMode[] }).modes ?? [];
+    },
+
     // --- LLM settings ---------------------------------------------------------
 
     async getSettings(): Promise<SettingsResponse> {
@@ -99,13 +115,14 @@ export const api = {
         return (body as { history: AgentChatMessage[] }).history ?? [];
     },
 
-    async agentChat(project: string, agent: string, message: string): Promise<AgentChatResponse> {
+    /** `mode` è opzionale: se assente il motore usa la modalità base (orchestrator). */
+    async agentChat(project: string, agent: string, message: string, mode?: ModeId): Promise<AgentChatResponse> {
         const res = await fetch(
             `/api/projects/${encodeURIComponent(project)}/agents/${encodeURIComponent(agent)}/chat`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message }),
+                body: JSON.stringify(mode ? { message, mode } : { message }),
             }
         );
         return asJson(res) as Promise<AgentChatResponse>;
@@ -139,6 +156,54 @@ export const api = {
             body: JSON.stringify({ whitelist, project }),
         });
         return asJson(res) as Promise<CapabilitiesResponse>;
+    },
+
+    // --- Autonomia (Fase A) -----------------------------------------------------
+
+    /** Policy di autonomia di un agente (default frontmatter + override tenant se `project`). */
+    async agentAutonomy(agent: string, project?: string): Promise<AutonomyResponse> {
+        const qs = project ? `?project=${encodeURIComponent(project)}` : '';
+        const res = await fetch(`/api/agents/${encodeURIComponent(agent)}/autonomy${qs}`, { cache: 'no-store' });
+        return asJson(res) as Promise<AutonomyResponse>;
+    },
+
+    /** Scrive le liste di autonomia: frontmatter (default), override tenant (`project`) o sessione (`session`). */
+    async setAgentAutonomy(
+        agent: string,
+        lists: AutonomyLists,
+        opts: { project?: string; session?: boolean } = {}
+    ): Promise<AutonomyResponse> {
+        const res = await fetch(`/api/agents/${encodeURIComponent(agent)}/autonomy`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...lists, ...opts }),
+        });
+        return asJson(res) as Promise<AutonomyResponse>;
+    },
+
+    /** Approvazioni in coda per un tenant (le chiamate `ask` in attesa, live). */
+    async approvals(project: string): Promise<Approval[]> {
+        const res = await fetch(`/api/projects/${encodeURIComponent(project)}/approvals`, { cache: 'no-store' });
+        const body = await asJson(res);
+        return (body as { approvals: Approval[] }).approvals ?? [];
+    },
+
+    /** Storico recente delle approvazioni (incluse stale/risolte) per il pannello. */
+    async approvalsAll(project: string): Promise<Approval[]> {
+        const res = await fetch(`/api/projects/${encodeURIComponent(project)}/approvals?all=1`, { cache: 'no-store' });
+        const body = await asJson(res);
+        return (body as { approvals: Approval[] }).approvals ?? [];
+    },
+
+    /** Risolve un'approvazione pendente: la chiamata in attesa prosegue o viene negata. */
+    async resolveApproval(project: string, id: string, approved: boolean): Promise<Approval> {
+        const res = await fetch(`/api/projects/${encodeURIComponent(project)}/approvals`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, approved }),
+        });
+        const body = await asJson(res);
+        return (body as { approval: Approval }).approval;
     },
 
     async projects(): Promise<ProjectMeta[]> {
@@ -266,6 +331,28 @@ export const api = {
             body: JSON.stringify({ project, action: 'checklist', itemId, checked }),
         });
         return asJson(res) as Promise<PMChecklistToggle>;
+    },
+
+    // --- Consegna al cliente --------------------------------------------------
+
+    /** Fotografia deterministica di cosa è già consegnabile, in lavorazione o mancante. */
+    async delivery(project: string): Promise<DeliverySnapshot> {
+        const res = await fetch(`/api/projects/${encodeURIComponent(project)}/delivery`, { cache: 'no-store' });
+        const body = await asJson(res);
+        return (body as { snapshot: DeliverySnapshot }).snapshot;
+    },
+
+    /** Genera il dossier di consegna; `include` vuoto = tutti gli item pronti. */
+    async produceDelivery(
+        project: string,
+        input: { title?: string; include?: string[]; notes?: string }
+    ): Promise<{ delivery: DeliveryResult; snapshot: DeliverySnapshot }> {
+        const res = await fetch(`/api/projects/${encodeURIComponent(project)}/delivery`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(input),
+        });
+        return asJson(res) as Promise<{ delivery: DeliveryResult; snapshot: DeliverySnapshot }>;
     },
 };
 

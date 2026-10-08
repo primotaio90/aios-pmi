@@ -27,7 +27,7 @@ export type AgentUsage = {
 export type AgentMeta = {
     id: string;
     name: string;
-    level: 'orchestrator' | 'director' | 'expert';
+    level: 'orchestrator' | 'pm' | 'director' | 'expert';
     department: 'core' | 'business' | 'tech' | 'delivery';
     director: string | null;
     model: string;
@@ -190,6 +190,8 @@ export type Toast = {
     id: string;
     level: 'info' | 'warn' | 'error' | 'success';
     message: string;
+    /** Approvazione associata (Fase A): se presente il toast mostra Approva/Nega. */
+    approval?: { id: string; agent: string; tool: string };
 };
 
 // --- LLM settings types -------------------------------------------------------
@@ -235,6 +237,8 @@ export type AgentChatMessage = {
     by: string;
     role: 'user' | 'agent';
     text: string;
+    /** Modalità operativa attiva al momento del turno. Assente nelle voci di storico precedenti. */
+    mode?: string;
 };
 
 export type AgentChatResponse = {
@@ -247,6 +251,35 @@ export type AgentNote = { ts: string; text: string };
 export type Capability = { qualified: string; server: string; tool: string; description: string };
 
 export type CapabilitiesResponse = { available: Capability[]; current: string[] };
+
+// --- Autonomia (Fase A) ------------------------------------------------------
+
+/** Policy di autonomia di un tool: parte da solo, chiede conferma, o vietato. */
+export type AutonomyPolicy = 'auto' | 'ask' | 'never';
+
+/** Le tre liste piatte `tool[:glob]` che compongono la policy di un agente. */
+export type AutonomyLists = { auto: string[]; ask: string[]; never: string[] };
+
+export type AutonomyResponse = {
+    available: Capability[];
+    /** Liste di default dell'agente (frontmatter). */
+    current: AutonomyLists;
+    /** Override per-tenant effettivo (state/autonomy.json), quando richiesto. */
+    project: AutonomyLists | null;
+};
+
+/** Richiesta di approvazione in coda per una chiamata `ask`. */
+export type Approval = {
+    id: string;
+    ts: string;
+    agent: string;
+    tool: string;
+    payload: Record<string, unknown>;
+    mode: string | null;
+    status: 'pending' | 'approved' | 'denied' | 'timeout' | 'stale';
+    decided_by: string | null;
+    decided_at: string | null;
+};
 
 // --- Project Manager (Fase 2) types -------------------------------------------
 
@@ -334,3 +367,54 @@ export type PMChecklistToggle = {
     item_id: string;
     checked: boolean;
 };
+
+// --- Modalità operative dell'orchestratore -----------------------------------
+
+export type ModeId = 'orchestrator' | 'architect' | 'code' | 'ask' | 'debug';
+
+export type OperatingMode = {
+    id: ModeId;
+    label: string;
+    icon: string;
+    color: string;
+    tagline: string;
+    description: string;
+    orchestrates: boolean;
+    tools: string[] | null;
+    allow_writes: boolean;
+    placeholder: string;
+    cta: string;
+};
+
+// --- Consegna ----------------------------------------------------------------
+
+export type DeliveryItem = {
+    id: string;
+    title: string;
+    kind: 'report' | 'output' | 'knowledge';
+    status: 'ready' | 'partial';
+    path: string | null;
+    department: string | null;
+    source: string | null;
+    updated_at: string | null;
+    size: number | null;
+    note: string | null;
+};
+
+export type DeliveryGap = { id: string; label: string; reason: string; task_id: string | null; department: string | null };
+
+export type DeliveryGoal = { id: string; text: string; status: string; report_path: string | null; ready: boolean };
+
+export type DeliveryFile = { path: string; name: string; size: number; mtime: string };
+
+export type DeliverySnapshot = {
+    project: ProjectMeta;
+    generated_at: string;
+    readiness: { score: number | null; ready: number; partial: number; missing: number };
+    items: DeliveryItem[];
+    gaps: DeliveryGap[];
+    goals: DeliveryGoal[];
+    previous: DeliveryFile[];
+};
+
+export type DeliveryResult = { path: string; content: string };

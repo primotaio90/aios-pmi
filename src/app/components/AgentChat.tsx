@@ -2,15 +2,19 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { api, ApiError } from '../lib/api';
-import type { AgentChatMessage, AgentMeta, AgentNote, Capability, Toast } from '../lib/types';
+import type { AgentChatMessage, AgentMeta, AgentNote, Capability, ModeId, OperatingMode, Toast } from '../lib/types';
 import { initials } from '../lib/text';
+import { ModeSelector } from './ModeSelector';
+import { AutonomyPanel } from './AutonomyPanel';
 
-type Tab = 'chat' | 'notes' | 'tools';
+type Tab = 'chat' | 'notes' | 'tools' | 'autonomy';
 
 /**
  * Direct chat with a single agent + two durable editors:
  *  - Chat: multi-turn conversation (real LLM when a provider is set; the agent
  *    can use its own whitelisted tools). "📌" turns a message into a permanent note.
+ *    For the orchestrator the consultant can pick an operating mode: it only
+ *    narrows the agent's tools and posture, never widens them.
  *  - Istruzioni: durable operative notes appended to the agent's system prompt.
  *  - Capacità: grant/revoke the agent's MCP tools (mcp_whitelist).
  */
@@ -19,20 +23,25 @@ export function AgentChat({
     agentId,
     onBack,
     pushToast,
+    modes = [],
 }: {
     project: string;
     agentId: string;
     onBack: () => void;
     pushToast: (t: Omit<Toast, 'id'>) => void;
+    /** Catalogo delle modalità operative: se assente il selettore non compare. */
+    modes?: OperatingMode[];
 }) {
     const [tab, setTab] = useState<Tab>('chat');
     const [agent, setAgent] = useState<AgentMeta | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
 
     // chat
     const [chat, setChat] = useState<AgentChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [busy, setBusy] = useState(false);
+    const [mode, setMode] = useState<ModeId>('orchestrator');
 
     // notes
     const [notes, setNotes] = useState<AgentNote[]>([]);
@@ -59,7 +68,10 @@ export function AgentChat({
                 setAvailable(caps.available);
                 setCurrent(caps.current);
             })
-            .catch((err) => alive && setError(err instanceof ApiError ? err.message : 'Caricamento agente fallito'));
+            .catch((err) => alive && setError(err instanceof ApiError ? err.message : 'Caricamento agente fallito'))
+            .finally(() => {
+                if (alive) setLoading(false);
+            });
         return () => {
             alive = false;
         };
@@ -72,14 +84,14 @@ export function AgentChat({
         setBusy(true);
         setInput('');
         // optimistic user bubble
-        setChat((prev) => [...prev, { ts: new Date().toISOString(), by: 'you', role: 'user', text }]);
+        setChat((prev) => [...prev, { ts: new Date().toISOString(), by: 'you', role: 'user', text, mode }]);
         try {
-            const { history } = await api.agentChat(project, agentId, text);
+            const { history } = await api.agentChat(project, agentId, text, mode);
             setChat(history);
         } catch (err) {
             setChat((prev) => [
                 ...prev,
-                { ts: new Date().toISOString(), by: agentId, role: 'agent', text: `⚠️ ${err instanceof ApiError ? err.message : 'chat fallita'}` },
+                { ts: new Date().toISOString(), by: agentId, role: 'agent', mode, text: `⚠️ ${err instanceof ApiError ? err.message : 'chat fallita'}` },
             ]);
         } finally {
             setBusy(false);
@@ -109,6 +121,9 @@ export function AgentChat({
             const caps = await api.setAgentCapabilities(agentId, current, project);
             setAvailable(caps.available);
             setCurrent(caps.current);
+            // Keep agent.mcp_whitelist in sync so the ModeSelector stops marking
+            // freshly granted tools as "not granted".
+            setAgent((prev) => (prev ? { ...prev, mcp_whitelist: caps.current } : prev));
             pushToast({ level: 'success', message: 'Capacità aggiornate' });
         } catch (err) {
             pushToast({ level: 'error', message: err instanceof ApiError ? err.message : 'Aggiornamento capacità fallito' });
@@ -123,6 +138,15 @@ export function AgentChat({
         return groups;
     }, [available]);
 
+    // Etichetta della modalità di una vecchia voce di storico (può mancare dal catalogo).
+    const modeLabel = useMemo(() => {
+        const byId = new Map(modes.map((m) => [String(m.id), m]));
+        return (id: string) => {
+            const m = byId.get(id);
+            return m ? `${m.icon} ${m.label}` : id;
+        };
+    }, [modes]);
+
     if (error) {
         return (
             <section className="director-panel">
@@ -132,6 +156,22 @@ export function AgentChat({
                     </button>
                 </div>
                 <div className="glass panel-state login-error">{error}</div>
+            </section>
+        );
+    }
+
+    // Gate the render until the registry+capabilities arrive: otherwise the tab
+    // "Capacità" shows an empty list and "Salva capacità" would persist an empty
+    // whitelist, silently revoking every tool of the agent.
+    if (loading) {
+        return (
+            <section className="director-panel">
+                <div className="header-actions">
+                    <button className="btn btn-secondary panel-back" onClick={onBack}>
+                        ← Home
+                    </button>
+                </div>
+                <div className="glass panel-state">Caricamento agente…</div>
             </section>
         );
     }
@@ -164,6 +204,9 @@ export function AgentChat({
                 <button className={`view-tab ${tab === 'tools' ? 'active' : ''}`} onClick={() => setTab('tools')}>
                     Capacità ({current.length})
                 </button>
+                <button className={`view-tab ${tab === 'autonomy' ? 'active' : ''}`} onClick={() => setTab('autonomy')}>
+                    Autonomia
+                </button>
             </nav>
 
             {tab === 'chat' && (
@@ -182,6 +225,9 @@ export function AgentChat({
                                 chat.map((m, i) => (
                                     <div key={i} className={`pm-chat-msg pm-chat-${m.role === 'agent' ? 'pm' : 'user'}`}>
                                         <span className="pm-chat-author">{m.role === 'agent' ? name : 'Tu'}</span>
+                                        {m.role === 'agent' && m.mode && m.mode !== 'orchestrator' && (
+                                            <span className="mode-badge">{modeLabel(m.mode)}</span>
+                                        )}
                                         <span className="pm-chat-text">{m.text}</span>
                                         {m.role === 'user' && (
                                             <button
@@ -197,6 +243,15 @@ export function AgentChat({
                                 ))
                             )}
                         </div>
+                        {agent?.level === 'orchestrator' && modes.length > 0 && (
+                            <ModeSelector
+                                modes={modes}
+                                value={mode}
+                                onChange={setMode}
+                                tools={agent.mcp_whitelist}
+                                disabled={busy}
+                            />
+                        )}
                         <form className="pm-chat-form" onSubmit={send}>
                             <input
                                 className="pm-chat-input"
@@ -257,6 +312,12 @@ export function AgentChat({
                             )}
                         </div>
                     </div>
+                </div>
+            )}
+
+            {tab === 'autonomy' && (
+                <div className="panel-grid panel-grid-1">
+                    <AutonomyPanel agentId={agentId} project={project} pushToast={pushToast} />
                 </div>
             )}
 

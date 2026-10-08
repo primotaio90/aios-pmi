@@ -1,5 +1,5 @@
+// AIOS System entry point
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { Bus } from './bus.mjs';
 import { Store } from './store.mjs';
 import { Registry } from './registry.mjs';
@@ -8,15 +8,18 @@ import { McpGateway } from './gateway.mjs';
 import { Lifecycle } from './lifecycle.mjs';
 import { Engine } from './engine.mjs';
 import { ProjectManager } from './pm.mjs';
+import { DeliveryDesk } from './delivery.mjs';
 import { AgentChat } from './chat.mjs';
 import { AgentEditor } from './agentEdit.mjs';
 import { Auth } from './auth.mjs';
+import { AutonomyPolicy, ApprovalQueue } from './autonomy.mjs';
 import { createRunner as createMockRunner } from './runners/mock.mjs';
 import { createRunner as createLlmRunner } from './runners/claude.mjs';
 import { getSettings } from './settings.mjs';
+import { resolveRoot } from './paths.mjs';
 
-// Repo root, independent of process.cwd(): src/lib/aios/ -> ../../..
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+// AIOS data root: AIOS_ROOT env (containers/volumes) or the repo root.
+const ROOT = resolveRoot();
 
 /**
  * System singleton. Stored on globalThis so Next.js HMR and every route
@@ -112,10 +115,27 @@ async function build() {
   }
   const engine = new Engine({ registry, store, bus, tasks, gateway, lifecycle, runner });
   const pm = new ProjectManager({ registry, store, bus, tasks, engine });
-  pm.start(); // subscribe to goal.*/task.* and emit pm.* notifications
+  pm.start(); // subscribe to goal.*/task.*/delivery.* and emit pm.* notifications
+  const delivery = new DeliveryDesk({ registry, store, bus, tasks, engine, gateway, reportUsage });
   const chat = new AgentChat({ registry, store, gateway, bus });
   const agentEditor = new AgentEditor({ registry, gateway, bus });
   const auth = new Auth(path.join(ROOT, 'config', 'users.json'));
+
+  // Autonomy (Fase A): the third permission axis. The policy resolves what an
+  // agent may do alone; the queue parks `ask` calls until a human decides.
+  // Wiring them into the gateway activates the third gate (skipped when unset,
+  // so behaviour without this module is byte-for-byte the old one).
+  const autonomy = new AutonomyPolicy({ registry, store });
+  const approvals = new ApprovalQueue({ bus, store });
+  gateway.autonomy = autonomy;
+  gateway.approvals = approvals;
+
+  // Boot cleanup: any 'pending' approval persisted by a previous process is an
+  // orphan (its in-memory resolver died with that process). Mark it stale so the
+  // panel shows it as no-longer-live instead of a button that does nothing.
+  for (const tenant of await store.listProjects().catch(() => [])) {
+    approvals.markOrphans(tenant.id).catch(() => { });
+  }
 
   // Persistence wiring: single writer for every audit log (no double logging).
   bus.subscribe((evt) => {
@@ -146,8 +166,11 @@ async function build() {
     lifecycle,
     engine,
     pm,
+    delivery,
     chat,
     agentEditor,
+    autonomy,
+    approvals,
     auth,
   };
 }
